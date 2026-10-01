@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>登录 - 港湾跳蚤市场</title>
+    <link href="lib/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/config.js"></script>
+    <script src="lib/axios.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/effects.js"></script>
+    <style>
+        .login-page .ambient-bg { z-index: 0; }
+        .login-page .ambient-blob { opacity: 0.7; filter: blur(100px); }
+        .login-page .ambient-blob.blob-1 { background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, transparent 70%); }
+        .login-page .ambient-blob.blob-2 { background: radial-gradient(circle, rgba(255,212,194,0.45) 0%, transparent 70%); }
+        .login-page .ambient-blob.blob-3 { background: radial-gradient(circle, rgba(255,176,103,0.35) 0%, transparent 70%); }
+        @media (max-width: 480px) { .login-card { padding: 26px 22px; } }
+        .sms-code-icon {
+            width: 52px; height: 52px; margin: 0 auto 12px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, rgba(255,122,69,0.15), rgba(255,165,2,0.15));
+            color: #ff7a45; font-size: 24px;
+        }
+        .sms-code-display {
+            display: flex; justify-content: center; gap: 8px; margin: 14px 0 8px;
+        }
+        .sms-code-display span {
+            width: 38px; height: 46px; line-height: 46px; text-align: center;
+            font-size: 24px; font-weight: 700; font-family: 'Courier New', monospace;
+            background: rgba(255,122,69,0.08); border: 1px solid rgba(255,122,69,0.25);
+            border-radius: 10px; color: #ff7a45;
+        }
+        .sms-code-expire { font-size: 12px !important; color: #999 !important; margin-bottom: 18px !important; }
+        @media (max-width: 380px) {
+            .sms-code-display span { width: 32px; height: 40px; line-height: 40px; font-size: 20px; }
+            .sms-code-display { gap: 5px; }
+        }
+    </style>
+</head>
+<body class="login-page">
+    <div class="ambient-bg" aria-hidden="true">
+        <div class="ambient-blob blob-1"></div>
+        <div class="ambient-blob blob-2"></div>
+        <div class="ambient-blob blob-3"></div>
+    </div>
+    <div class="login-logo"><i class="fa fa-shopping-bag"></i></div>
+    <div class="login-title">港湾跳蚤市场</div>
+    <div class="login-subtitle">让闲置好物，遇见新主人</div>
+
+    <div class="login-card" id="loginCard">
+        <div class="login-tabs">
+            <div class="login-tab" :class="{active: mode==='login'}" @click="mode='login'">账号登录</div>
+            <div class="login-tab" :class="{active: mode==='sms'}" @click="mode='sms'">短信登录</div>
+            <div class="login-tab" :class="{active: mode==='register'}" @click="mode='register'">注册账号</div>
+        </div>
+
+        <div class="login-form">
+            <!-- 短信登录 -->
+            <template v-if="mode==='sms'">
+                <div class="form-group">
+                    <label>手机号</label>
+                    <input type="tel" v-model="phone" placeholder="请输入手机号" maxlength="11">
+                </div>
+                <div class="form-group">
+                    <label>验证码</label>
+                    <div class="form-sms">
+                        <input type="text" v-model="smsCode" placeholder="请输入验证码" maxlength="6" @keyup.enter="submit">
+                        <button class="btn-sms" :disabled="smsCountdown>0" @click="sendSms">{{smsCountdown>0 ? smsCountdown + 's 后重发' : '获取验证码'}}</button>
+                    </div>
+                    <div class="form-hint" style="color:#999;">演示环境：点击"获取验证码"后直接弹出验证码</div>
+                </div>
+            </template>
+
+            <!-- 账号 -->
+            <div class="form-group" v-if="mode!=='sms'">
+                <label>账号</label>
+                <input type="text" v-model="username" placeholder="请输入账号" maxlength="20">
+            </div>
+
+            <!-- 密码 -->
+            <div class="form-group" v-if="mode!=='sms'">
+                <label>密码</label>
+                <input type="password" v-model="password" placeholder="请输入密码" @keyup.enter="submit">
+            </div>
+
+            <!-- 注册时的昵称 -->
+            <div class="form-group" v-if="mode==='register'">
+                <label>昵称（选填）</label>
+                <input type="text" v-model="nickname" placeholder="给自己起个好听的昵称">
+            </div>
+
+            <!-- 注册时的手机号 + 验证码（选填） -->
+            <template v-if="mode==='register'">
+                <div class="form-group">
+                    <label>手机号（选填）</label>
+                    <input type="tel" v-model="phone" placeholder="绑定手机号" maxlength="11">
+                </div>
+                <div class="form-group" v-if="phone">
+                    <label>验证码</label>
+                    <div class="form-sms">
+                        <input type="text" v-model="smsCode" placeholder="请输入验证码" maxlength="6">
+                        <button class="btn-sms" :disabled="smsCountdown>0" @click="sendSms">{{smsCountdown>0 ? smsCountdown + 's 后重发' : '获取验证码'}}</button>
+                    </div>
+                    <div class="form-hint" style="color:#999;">演示环境：点击"获取验证码"后直接弹出验证码</div>
+                </div>
+            </template>
+
+            <div class="form-hint" v-if="hint">{{hint}}</div>
+
+            <button class="btn btn-primary btn-block login-btn" :class="{'btn-disabled':submitting}" @click="submit">
+                {{submitting ? '请稍候...' : (mode==='register' ? '注 册' : '登 录')}}
+            </button>
+        </div>
+
+        <div class="login-footer">
+            <span v-if="mode!=='register'">还没有账号？<a @click="mode='register'">立即注册</a></span>
+            <span v-else>已有账号？<a @click="mode='login'">去登录</a></span>
+        </div>
+    </div>
+
+    <script src="lib/vue.global.prod.js"></script>
+    <script>
+        const { createApp, ref } = Vue;
+        createApp({
+            setup() {
+                const mode = ref('login');
+                const username = ref('');
+                const password = ref('');
+                const nickname = ref('');
+                const phone = ref('');
+                const smsCode = ref('');
+                const smsCountdown = ref(0);
+                const hint = ref('');
+                const submitting = ref(false);
+                let smsTimer = null;
+
+                async function sendSms() {
+                    hint.value = '';
+                    if (!/^1\d{10}$/.test(phone.value)) return hint.value = '请输入正确的手机号';
+                    try {
+                        const res = await authApi.sendSms({ phone: phone.value });
+                        const code = res.data && res.data.smsCode;
+                        if (code) {
+                            smsCode.value = code;
+                            showSmsCodeModal(code, phone.value);
+                        } else {
+                            showToast('验证码已发送');
+                        }
+                        smsCountdown.value = 60;
+                        if (smsTimer) clearInterval(smsTimer);
+                        smsTimer = setInterval(() => {
+                            smsCountdown.value--;
+                            if (smsCountdown.value <= 0) { clearInterval(smsTimer); smsTimer = null; }
+                        }, 1000);
+                    } catch (e) { hint.value = e.message; }
+                }
+
+                function showSmsCodeModal(code, phoneNum) {
+                    const old = document.getElementById('smsCodeModal');
+                    if (old) old.remove();
+                    const overlay = document.createElement('div');
+                    overlay.className = 'modal-overlay';
+                    overlay.id = 'smsCodeModal';
+                    overlay.innerHTML = [
+                        '<div class="modal-box sms-code-box scale-in">',
+                        '<div class="sms-code-icon"><i class="fa fa-commenting-o"></i></div>',
+                        '<h3>验证码已发送</h3>',
+                        '<p>短信已发送至 ' + phoneNum.replace(/^(\d{3})\d{4}/, '$1****') + '</p>',
+                        '<div class="sms-code-display">' + code.split('').map(d => '<span>' + d + '</span>').join('') + '</div>',
+                        '<p class="sms-code-expire">5 分钟内有效 · 已自动填入</p>',
+                        '<div class="modal-actions">',
+                        '<button class="btn btn-ghost sms-code-copy">复制</button>',
+                        '<button class="btn btn-primary sms-code-ok">知道了</button>',
+                        '</div></div>'
+                    ].join('');
+                    document.body.appendChild(overlay);
+                    const close = () => overlay.remove();
+                    overlay.querySelector('.sms-code-ok').onclick = close;
+                    overlay.onclick = e => { if (e.target === overlay) close(); };
+                    overlay.querySelector('.sms-code-copy').onclick = async () => {
+                        try {
+                            await navigator.clipboard.writeText(code);
+                            showToast('验证码已复制');
+                        } catch (_) {
+                            showToast('复制失败，请手动记录');
+                        }
+                    };
+                }
+
+                async function submit() {
+                    hint.value = '';
+                    if (mode.value === 'sms') {
+                        if (!/^1\d{10}$/.test(phone.value)) return hint.value = '请输入正确的手机号';
+                        if (!smsCode.value) return hint.value = '请输入验证码';
+                    } else {
+                        if (!username.value) return hint.value = '请输入账号';
+                        if (!password.value) return hint.value = '请输入密码';
+                        if (mode.value === 'register') {
+                            if (password.value.length < 6) return hint.value = '密码至少6位';
+                            if (phone.value) {
+                                if (!/^1\d{10}$/.test(phone.value)) return hint.value = '请输入正确的手机号';
+                                if (!smsCode.value) return hint.value = '填写手机号后需输入验证码';
+                            }
+                        }
+                    }
+
+                    submitting.value = true;
+                    try {
+                        let res;
+                        if (mode.value === 'login') {
+                            res = await authApi.login({ username: username.value, password: password.value });
+                        } else if (mode.value === 'sms') {
+                            res = await authApi.login({ phone: phone.value, smsCode: smsCode.value });
+                        } else {
+                            const data = { username: username.value, password: password.value, nickname: nickname.value };
+                            if (phone.value) { data.phone = phone.value; data.smsCode = smsCode.value; }
+                            await authApi.register(data);
+                            // 注册成功后自动登录，免去手动再登一次
+                            res = await authApi.login({ username: username.value, password: password.value });
+                        }
+                        const data = res.data || {};
+                        if (data.token) {
+                            localStorage.setItem('token', data.token);
+                            localStorage.setItem('user', JSON.stringify(data.user || {}));
+                            if (typeof celebrate === 'function') celebrate();
+                            showToast(mode.value === 'register' ? '注册成功' : '登录成功');
+                            const back = new URLSearchParams(location.search).get('back') || 'index.html';
+                            location.href = back;
+                        } else {
+                            showToast('操作成功');
+                            mode.value = 'login';
+                        }
+                    } catch (e) { hint.value = e.message; }
+                    submitting.value = false;
+                }
+
+                return { mode, username, password, nickname, phone, smsCode, smsCountdown, hint, submitting, sendSms, submit };
+            }
+        }).mount('#loginCard');
+    </script>
+</body>
+</html>

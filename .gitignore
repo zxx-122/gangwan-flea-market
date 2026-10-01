@@ -1,0 +1,49 @@
+# --- 编译 / 构建产物 ---
+target/
+build/
+dist/
+*.class
+*.jar
+!.mvn/wrapper/*.jar
+
+# --- IDE ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# --- 运行时 / 日志 ---
+*.log
+logs/
+dump.rdb
+nul
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 临时 ---
+outputs/
+progress/
+TEMP/
+tmp/
+
+# --- 运行时数据库(H2) ---
+*.mv.db
+*.trace.db
+data/
+
+# --- 运行时数据库(SQLite，含用户数据，严禁入库) ---
+*.db
+*.db.bak*
+uploads/
+
+# --- 环境与凭据 ---
+.env
+*.exp

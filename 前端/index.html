@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>港湾跳蚤市场</title>
+    <link href="lib/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="lib/vue.global.prod.js"></script>
+    <script src="lib/vue-router.global.prod.js"></script>
+    <script src="lib/axios.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/effects.js"></script>
+    <script src="js/api.js"></script>
+</head>
+<body>
+<div id="app">
+    <!-- 环境光斑背景 -->
+    <div class="ambient-bg" aria-hidden="true">
+        <div class="ambient-blob blob-1"></div>
+        <div class="ambient-blob blob-2"></div>
+        <div class="ambient-blob blob-3"></div>
+    </div>
+
+    <router-view v-slot="{ Component }">
+        <transition name="route" mode="out-in">
+            <component :is="Component" />
+        </transition>
+    </router-view>
+
+    <!-- 全局底部 Tab 栏（仅主页面显示） -->
+    <div class="tabbar" v-if="showTabbar">
+        <div class="tabbar-item" :class="{active: currentTab==='home'}" @click="goTab('/home')">
+            <i class="fa fa-home tab-icon"></i><span>首页</span>
+        </div>
+        <div class="tabbar-item" :class="{active: currentTab==='publish'}" @click="goTab('/publish')">
+            <i class="fa fa-plus-square tab-icon"></i><span>发布</span>
+        </div>
+        <div class="tabbar-item" :class="{active: currentTab==='message'}" @click="goTab('/messages')" style="position:relative;">
+            <i class="fa fa-comment tab-icon"></i><span>消息</span>
+            <span class="badge" v-if="totalUnread>0" style="position:absolute;top:4px;right:18px;">{{totalUnread}}</span>
+        </div>
+        <div class="tabbar-item" :class="{active: currentTab==='profile'}" @click="goTab('/profile')">
+            <i class="fa fa-user tab-icon"></i><span>我的</span>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, onMounted, onUnmounted, onActivated, watch, nextTick } = Vue;
+const { createRouter, createWebHashHistory, useRouter, useRoute } = VueRouter;
+
+// ===================== 全局 store（挂在 window 上，跨组件共享） =====================
+const store = reactive({
+    user: JSON.parse(localStorage.getItem('user') || 'null'),
+    categories: [],
+    totalUnread: 0,
+    setUser(u) {
+        this.user = u;
+        if (u) localStorage.setItem('user', JSON.stringify(u));
+        else localStorage.removeItem('user');
+    },
+    async loadCategories() {
+        if (this.categories.length) return;
+        try {
+            const res = await categoryApi.getList();
+            this.categories = res.data || [];
+        } catch (e) { /* ignore */ }
+    },
+    async refreshUnread() {
+        if (!isLoggedIn()) { this.totalUnread = 0; return; }
+        try {
+            const res = await messageApi.getSessions();
+            this.totalUnread = (res.data || []).reduce((s, x) => s + (x.unread || 0), 0);
+        } catch (e) { /* ignore */ }
+    }
+});
+window.store = store;
+
+// 启动未读消息轮询
+setInterval(() => store.refreshUnread(), 30000);
+
+// ===================== 首页 =====================
+const Home = {
+    template: `
+    <div class="page" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+        <div class="pull-indicator" :class="{refreshing: refreshing}" :style="{height: pullDist + 'px', padding: (pullDist > 20 || refreshing) ? '12px 0' : '0', overflow: 'hidden'}">
+            <template v-if="pullDist > 20 || refreshing">
+                <span v-if="refreshing"><span class="pull-spinner"></span>正在刷新...</span>
+                <span v-else>{{pullDist >= 70 ? '松开立即刷新' : '下拉刷新'}}</span>
+            </template>
+        </div>
+        <div class="home-header glass">
+            <div class="home-user">
+                <div class="home-avatar" @click="toProfile">
+                    <img v-if="store.user && store.user.avatar" :src="imgUrl(store.user.avatar)">
+                    <i v-else class="fa fa-user"></i>
+                </div>
+                <div class="home-username" v-if="store.user">{{store.user.nickname || store.user.username}}</div>
+                <button v-else class="home-login-btn" @click="$router.push('/login')">登录 / 注册</button>
+            </div>
+            <div class="home-search" @click="searchOpen=true">
+                <i class="fa fa-search search-icon"></i>
+                <span class="search-text">搜索你想要的宝贝</span>
+            </div>
+        </div>
+
+        <div class="category-nav">
+            <div class="category-item" v-for="c in store.categories" :key="c.id" @click="filterCategory(c.id)">
+                <div class="category-icon"><img v-if="c.icon" :src="imgUrl(c.icon)" style="width:24px;height:24px;"><i v-else class="fa fa-tag"></i></div>
+                <div class="category-name">{{c.name}}</div>
+            </div>
+        </div>
+
+        <div class="sort-toolbar">
+            <div class="sort-chip" :class="{active: activeSort==='new'}" @click="setSort('new')">最新</div>
+            <div class="sort-chip" :class="{active: activeSort==='hot'}" @click="setSort('hot')">最热</div>
+            <div class="sort-chip" :class="{active: activeSort==='price_asc'}" @click="setSort('price_asc')">价格↑</div>
+            <div class="sort-chip" :class="{active: activeSort==='price_desc'}" @click="setSort('price_desc')">价格↓</div>
+        </div>
+        <div class="sort-toolbar" style="margin-top:-6px;">
+            <div class="sort-chip" :class="{active: activeCat===null}" @click="filterCategory(null)">全部</div>
+            <div class="sort-chip" :class="{active: activeCat===c.id}" v-for="c in store.categories" :key="c.id" @click="filterCategory(c.id)">{{c.name}}</div>
+        </div>
+
+            <div class="waterfall" v-if="items.length">
+                <div class="item-card liquid-card" v-for="it in items" :key="it.id" @click="toDetail(it.id)">
+                <img class="item-img" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                <div class="item-info">
+                    <div class="item-title">{{it.title}}</div>
+                    <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
+                    <div class="item-extra">
+                        <span><i class="fa fa-user-o"></i> {{it.views||0}}浏览</span>
+                        <span>{{shortTime(it.createdAt)}}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="load-more" v-if="items.length && !noMore">
+            <span class="scroll-spinner" v-if="loading"></span>
+            {{loading ? '加载中...' : '上拉加载更多'}}
+        </div>
+        <div class="empty-state" v-if="!loading && !items.length">
+            <div class="icon"><i class="fa fa-inbox"></i></div>
+            <div class="text">暂无商品</div>
+            <div class="sub" v-if="activeCat">该分类下还没有商品</div>
+        </div>
+
+        <!-- 搜索遮罩 -->
+        <div class="search-overlay" v-if="searchOpen">
+            <div class="search-header">
+                <i class="fa fa-arrow-left navbar-back" @click="searchOpen=false"></i>
+                <input v-model="keyword" placeholder="搜索商品关键词" @keyup.enter="doSearch" ref="searchInput">
+                <span class="cancel-btn" @click="doSearch">搜索</span>
+            </div>
+            <div class="search-hot" v-if="!searched">
+                <div class="search-hot-title"><i class="fa fa-fire"></i> 大家都在搜</div>
+                <div class="search-hot-words">
+                    <span class="hot-word" v-for="(w,i) in hotWords" :key="w" @click="keyword=w; doSearch()"><b>{{i+1}}</b>{{w}}</span>
+                </div>
+            </div>
+            <div class="search-results">
+                    <div class="waterfall" v-if="searchResults.length">
+                        <div class="item-card liquid-card" v-for="it in searchResults" :key="it.id" @click="searchOpen=false; toDetail(it.id)">
+                        <img class="item-img" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                        <div class="item-info">
+                            <div class="item-title">{{it.title}}</div>
+                            <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" v-if="searched && !searchResults.length">
+                    <div class="icon"><i class="fa fa-search"></i></div>
+                    <div class="text">没有找到相关商品</div>
+                    <div class="sub" style="margin-top:14px;text-align:left;padding:0 20px;">
+                        <div style="margin-bottom:8px;color:#999;font-size:13px;">猜你想搜：</div>
+                        <div class="related-words">
+                            <span class="related-word" v-for="w in suggestWords" :key="w" @click="keyword=w; doSearch()">{{w}}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const router = useRouter();
+        const items = ref([]);
+        const loading = ref(false);
+        const page = ref(1);
+        const size = 10;
+        const total = ref(0);
+        const activeCat = ref(null);
+        const activeSort = ref('new');
+        const searchOpen = ref(false);
+        const keyword = ref('');
+        const searchResults = ref([]);
+        const searched = ref(false);
+        const searchInput = ref(null);
+        const hotWords = ['二手手机', '富士相机', 'Kindle', 'Switch', '宜家', '吉他', '运动鞋', '显示器'];
+        const suggestWords = ['二手手机', '闲置数码', '服饰', '图书', '家居', '运动器材'];
+
+        const noMore = computed(() => items.value.length >= total.value);
+
+        async function load(reset) {
+            if (loading.value) return;
+            if (reset) { page.value = 1; items.value = []; }
+            loading.value = true;
+            try {
+                const params = { page: page.value, size, sort: activeSort.value };
+                const res = activeCat.value
+                    ? await itemApi.byCategory(activeCat.value, params)
+                    : await itemApi.list(params);
+                const pr = res.data || {};
+                const list = pr.data || [];
+                items.value = reset ? list : items.value.concat(list);
+                total.value = pr.total || 0;
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+
+        function filterCategory(id) {
+            activeCat.value = id;
+            load(true);
+        }
+
+        function setSort(s) {
+            if (activeSort.value === s) return;
+            activeSort.value = s;
+            load(true);
+        }
+
+        async function doSearch() {
+            if (!keyword.value.trim()) { searched.value = false; searchResults.value = []; return; }
+            try {
+                const res = await itemApi.search({ keyword: keyword.value, page: 1, size: 50 });
+                searchResults.value = (res.data && res.data.data) || [];
+            } catch (e) { showToast(e.message); }
+            searched.value = true;
+        }
+
+        function toDetail(id) { router.push('/item/' + id); }
+        function toProfile() { router.push('/profile'); }
+
+        // 下拉刷新（仅列表滚动到顶部时触发）
+        const pullDist = ref(0);
+        const refreshing = ref(false);
+        let touchStartY = -1;
+
+        function atTop() { return (document.documentElement.scrollTop || document.body.scrollTop) <= 0; }
+        function onTouchStart(e) {
+            if (searchOpen.value || refreshing.value) { touchStartY = -1; return; }
+            touchStartY = atTop() ? e.touches[0].clientY : -1;
+        }
+        function onTouchMove(e) {
+            if (touchStartY < 0 || refreshing.value) return;
+            const dy = e.touches[0].clientY - touchStartY;
+            if (dy > 0 && atTop()) {
+                pullDist.value = Math.min(dy * 0.5, 100);
+                if (e.cancelable) e.preventDefault();
+            }
+        }
+        async function onTouchEnd() {
+            if (touchStartY < 0) return;
+            touchStartY = -1;
+            if (pullDist.value >= 70 && !refreshing.value) {
+                refreshing.value = true;
+                pullDist.value = 50;
+                await load(true);
+                refreshing.value = false;
+            }
+            pullDist.value = 0;
+        }
+
+        function onScroll() {
+            if (searchOpen.value) return;
+            const st = document.documentElement.scrollTop || document.body.scrollTop;
+            const sh = document.documentElement.scrollHeight;
+            if (sh - st - window.innerHeight < 100 && !noMore.value && !loading.value) {
+                page.value++; load(false);
+            }
+        }
+
+        onMounted(() => {
+            store.loadCategories();
+            load(true);
+            store.refreshUnread();
+            window.addEventListener('scroll', onScroll);
+        });
+        onUnmounted(() => { window.removeEventListener('scroll', onScroll); });
+
+        watch(searchOpen, v => {
+            if (v) { searched.value = false; nextTick(() => searchInput.value && searchInput.value.focus()); }
+        });
+
+        return {
+            store, items, loading, noMore, activeCat, activeSort, setSort,
+            searchOpen, keyword, searchResults, searched, searchInput, hotWords, suggestWords,
+            filterCategory, doSearch, toDetail, toProfile,
+            pullDist, refreshing, onTouchStart, onTouchMove, onTouchEnd,
+            imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
+        };
+    }
+};
+
+// ===================== 商品详情 =====================
+const ItemDetail = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.back()"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">商品详情</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;"><span class="scroll-spinner"></span> 加载中...</div>
+        <div v-else-if="detail">
+            <div class="detail-carousel">
+                <img :src="imgUrl(currentImg)" @click="lightbox=true" @error="onImgErr">
+                <div class="carousel-count" v-if="images.length>1">{{imgIdx+1}} / {{images.length}}</div>
+                <div class="carousel-nav carousel-nav-left" v-if="images.length>1" @click="prevImg">‹</div>
+                <div class="carousel-nav carousel-nav-right" v-if="images.length>1" @click="nextImg">›</div>
+            </div>
+            <div class="detail-body">
+                <div class="detail-price">¥{{fmtPrice(detail.price)}}</div>
+                <div class="detail-title">{{detail.title}}</div>
+                <div class="detail-tags">
+                    <span class="detail-tag" v-if="detail.condition">{{detail.condition}}</span>
+                    <span class="detail-tag" v-if="detail.categoryName">{{detail.categoryName}}</span>
+                    <span class="detail-tag badge" v-if="detail.isOriginal===1"><i class="fa fa-camera"></i> 实拍</span>
+                    <span class="detail-tag badge" v-if="detail.isFreeShip===1"><i class="fa fa-truck"></i> 包邮</span>
+                    <span class="detail-tag">{{detail.views||0}} 次浏览</span>
+                </div>
+                <div class="detail-sell-tags" v-if="detail.tags">
+                    <span class="sell-tag" v-for="t in (String(detail.tags).split(',').filter(Boolean))" :key="t">{{t}}</span>
+                </div>
+                <div class="detail-desc">{{detail.description || '暂无描述'}}</div>
+            </div>
+            <div class="detail-section">
+                <div class="detail-section-title">卖家信息</div>
+                <div class="seller-info">
+                    <div class="seller-avatar">
+                        <img v-if="detail.seller && detail.seller.avatar" :src="imgUrl(detail.seller.avatar)">
+                        <i v-else class="fa fa-user"></i>
+                    </div>
+                    <div class="seller-detail">
+                        <div class="seller-name">{{detail.seller ? (detail.seller.nickname || detail.seller.username) : '匿名卖家'}}</div>
+                        <div class="seller-meta">发布于 {{shortTime(detail.createdAt)}}</div>
+                    </div>
+                    <div class="seller-stats" v-if="detail.seller && detail.seller.stats">
+                        <span class="stat-item"><b>{{detail.seller.stats.soldCount||0}}</b> 成交</span>
+                        <span class="stat-item"><b>{{detail.seller.stats.onSaleCount||0}}</b> 在售</span>
+                        <span class="stat-item"><b>{{fmtPrice(detail.seller.stats.rating||0)}}%</b> 好评</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 同款推荐 -->
+            <div class="detail-section" v-if="relatedList.length">
+                <div class="detail-section-title">看了又看 · 同款推荐</div>
+                <div class="related-list">
+                    <div class="item-card liquid-card related-card" v-for="it in relatedList" :key="it.id" @click="$router.push('/item/'+it.id)">
+                        <img class="item-img" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                        <div class="item-info">
+                            <div class="item-title">{{it.title}}</div>
+                            <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
+                            <div class="item-extra"><span><i class="fa fa-heart-o"></i> {{it.views||0}}浏览</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="height:80px;"></div>
+
+            <div class="detail-bottom">
+                <div class="fav-btn" :class="{favorited: favorited}" @click="toggleFav" v-if="detail.status==='在售'">
+                    <i :class="favorited ? 'fa fa-heart' : 'fa fa-heart-o'"></i>
+                    <span>{{favorited ? '已收藏' : '收藏'}}</span>
+                </div>
+                <div class="btn-chat" @click="contactSeller" v-if="!isOwner">联系卖家</div>
+                <div class="btn-buy" v-if="!isOwner && detail.status==='在售'" @click="showBuy=true">立即购买</div>
+                <div class="btn-buy" v-if="!isOwner && detail.status==='已售'" style="flex:1;background:#999;">已售出</div>
+                <div class="btn-buy" v-if="!isOwner && detail.status==='下架'" style="flex:1;background:#999;">已下架</div>
+                <div class="btn-buy" v-if="isOwner" style="flex:1;background:#999;">这是您的商品</div>
+            </div>
+
+            <!-- 购买弹窗 -->
+            <div class="modal-overlay" v-if="showBuy">
+                <div class="modal-box" style="max-width:340px;">
+                    <h3>确认购买</h3>
+                    <p style="text-align:left;color:#666;">商品价格：¥{{fmtPrice(detail.price)}}</p>
+                    <div class="form-group" style="margin-top:12px;">
+                        <label>收货人姓名</label>
+                        <input v-model="order.receiverName" placeholder="请输入收货人姓名">
+                    </div>
+                    <div class="form-group">
+                        <label>联系电话</label>
+                        <input v-model="order.receiverPhone" placeholder="请输入手机号">
+                    </div>
+                    <div class="form-group">
+                        <label>收货地址</label>
+                        <textarea v-model="order.receiverAddress" placeholder="请输入详细收货地址" style="min-height:70px;"></textarea>
+                    </div>
+                    <div class="fee-hint">确认收货后，卖家实收 ¥{{sellerIncome}}（平台抽成 1.6%）</div>
+                    <div class="modal-actions" style="margin-top:16px;">
+                        <button class="btn btn-ghost" @click="showBuy=false">取消</button>
+                        <button class="btn btn-primary" :class="{'btn-disabled':submitting}" @click="submitOrder">提交订单</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 灯箱 -->
+            <div class="lightbox-overlay" v-if="lightbox" @click="lightbox=false">
+                <span class="lightbox-close" @click="lightbox=false"><i class="fa fa-times"></i></span>
+                <img :src="imgUrl(currentImg)" @click.stop="">
+                <div class="lightbox-thumbs" v-if="images.length>1" @click.stop="">
+                    <img v-for="(im,i) in images" :key="i" class="lightbox-thumb" :class="{active:i===imgIdx}" :src="imgUrl(im.url || im)" @click="imgIdx=i">
+                </div>
+            </div>
+        </div>
+        <div class="empty-state" v-else>
+            <div class="icon"><i class="fa fa-meh-o"></i></div>
+            <div class="text">商品不存在或已下架</div>
+        </div>
+    </div>`,
+    setup() {
+        const route = useRoute();
+        const router = useRouter();
+        const detail = ref(null);
+        const loading = ref(true);
+        const imgIdx = ref(0);
+        const favorited = ref(false);
+        const showBuy = ref(false);
+        const lightbox = ref(false);
+        const submitting = ref(false);
+        const order = reactive({ receiverName: '', receiverPhone: '', receiverAddress: '' });
+        const relatedList = ref([]);
+
+        const images = computed(() => (detail.value && detail.value.images) || []);
+        const currentImg = computed(() => {
+            if (!images.value.length) return '';
+            const im = images.value[imgIdx.value];
+            return im.url || im;
+        });
+        const isOwner = computed(() => store.user && detail.value && store.user.id === detail.value.userId);
+        const sellerIncome = computed(() => {
+            const p = parseFloat(detail.value && detail.value.price || 0);
+            return (p * 0.984).toFixed(2);
+        });
+
+        function prevImg() { imgIdx.value = (imgIdx.value - 1 + images.value.length) % images.value.length; }
+        function nextImg() { imgIdx.value = (imgIdx.value + 1) % images.value.length; }
+
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await itemApi.getById(route.params.id);
+                detail.value = res.data;
+                imgIdx.value = 0;
+                loadRelated();
+                if (isLoggedIn()) {
+                    try {
+                        const fr = await favoriteApi.check(route.params.id);
+                        favorited.value = !!fr.data;
+                    } catch (e) {}
+                }
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+
+        async function loadRelated() {
+            if (!detail.value) return;
+            try {
+                const res = await itemApi.related(route.params.id, { limit: 8 });
+                relatedList.value = (res.data || []).slice(0, 4);
+            } catch (e) {}
+        }
+
+        async function toggleFav() {
+            if (!requireLogin(router)) return;
+            try {
+                if (favorited.value) {
+                    await favoriteApi.remove(route.params.id);
+                    favorited.value = false;
+                    showToast('已取消收藏');
+                } else {
+                    await favoriteApi.add({ itemId: route.params.id });
+                    favorited.value = true;
+                    showToast('收藏成功');
+                }
+            } catch (e) { showToast(e.message); }
+        }
+
+        function contactSeller() {
+            if (!requireLogin(router)) return;
+            if (!detail.value.seller) return showToast('无法获取卖家信息');
+            router.push('/chat/' + detail.value.seller.id + '/' + detail.value.id);
+        }
+
+        async function submitOrder() {
+            if (!order.receiverName || !order.receiverPhone || !order.receiverAddress) {
+                return showToast('请填写完整收货信息');
+            }
+            submitting.value = true;
+            try {
+                await orderApi.create({ itemId: route.params.id, ...order });
+                if (typeof celebrate === 'function') celebrate();
+                showToast('下单成功！');
+                showBuy.value = false;
+                router.push('/orders');
+            } catch (e) { showToast(e.message); }
+            submitting.value = false;
+        }
+
+        onMounted(() => { load(); });
+        return {
+            detail, loading, images, currentImg, imgIdx, favorited, showBuy, lightbox,
+            submitting, order, isOwner, sellerIncome, relatedList,
+            prevImg, nextImg, load, loadRelated, toggleFav, contactSeller, submitOrder,
+            imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
+        };
+    }
+};
+
+// ===================== 发布/编辑商品 =====================
+const Publish = {
+    template: `
+    <div class="page">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.back()"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">{{editId ? '编辑商品' : '发布闲置'}}</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div class="create-form">
+            <div class="form-group">
+                <label>商品图片 <span style="color:#999;font-size:12px;">(最多9张)</span></label>
+                <div class="image-upload-area">
+                    <div class="image-upload-item" v-for="(im,i) in form.images" :key="i">
+                        <img :src="imgUrl(im)">
+                        <div class="remove-btn" @click="removeImg(i)"><i class="fa fa-times"></i></div>
+                    </div>
+                    <label class="image-upload-add" v-if="form.images.length<9">
+                        <input type="file" accept="image/*" multiple style="display:none;" @change="onPick">
+                        <i class="fa fa-camera icon"></i>
+                        <span class="text">添加图片</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>商品标题 <span class="required">*</span></label>
+                <input v-model="form.title" placeholder="好标题能更快卖出" maxlength="100">
+            </div>
+            <div class="form-group">
+                <label>价格 (元) <span class="required">*</span></label>
+                <input v-model="form.price" type="number" step="0.01" placeholder="0.00">
+                <div class="price-ref" v-if="priceRef && priceRef.count > 0">
+                    <i class="fa fa-line-chart"></i> 该类目成交参考：均价 <b>¥{{fmtPrice(priceRef.avg)}}</b>（{{priceRef.count}}件在售，区间 ¥{{fmtPrice(priceRef.min)}} ~ ¥{{fmtPrice(priceRef.max)}}）
+                </div>
+                <div class="price-ref" v-else-if="priceRef && priceRef.loaded && priceRef.count===0">
+                    <i class="fa fa-info-circle"></i> 该分类暂无在售商品，可参考其他平台定价
+                </div>
+            </div>
+            <div class="form-group">
+                <label>分类</label>
+                <select v-model="form.categoryId">
+                    <option :value="null">请选择分类</option>
+                    <option v-for="c in store.categories" :key="c.id" :value="c.id">{{c.name}}</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>成色</label>
+                <select v-model="form.condition">
+                    <option value="">请选择成色</option>
+                    <option>全新</option>
+                    <option>几乎全新</option>
+                    <option>轻微使用痕迹</option>
+                    <option>明显使用痕迹</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>卖点标签 <span style="color:#999;font-size:12px;">(可多选，提升曝光)</span></label>
+                <div class="tag-group">
+                    <span class="tag-chip" :class="{on: form.tags.includes(t)}" v-for="t in tagOptions" :key="t" @click="toggleTag(t)">{{t}}</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>实物拍摄 / 包邮</label>
+                <div class="tag-group">
+                    <span class="tag-chip" :class="{on: form.isOriginal===1}" @click="form.isOriginal = form.isOriginal===1 ? 0 : 1"><i class="fa fa-camera"></i> 实物拍摄</span>
+                    <span class="tag-chip" :class="{on: form.isFreeShip===1}" @click="form.isFreeShip = form.isFreeShip===1 ? 0 : 1"><i class="fa fa-truck"></i> 包邮</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>详细描述</label>
+                <textarea v-model="form.description" placeholder="描述一下宝贝的品牌、入手时间、转手原因等..."></textarea>
+            </div>
+            <button class="btn btn-primary btn-block btn-lg" :class="{'btn-disabled':submitting}" @click="submit">{{submitting ? '提交中...' : (editId ? '保存修改' : '确认发布')}}</button>
+        </div>
+    </div>`,
+    setup() {
+        const route = useRoute();
+        const router = useRouter();
+        const editId = ref(route.params.id || null);
+        const submitting = ref(false);
+        const tagOptions = ['全新', '几乎全新', '一机一图', '已验机', '砍价嚒怪勿扰', '支持当面交易'];
+        const priceRef = reactive({ count: 0, avg: null, min: null, max: null, loaded: false });
+        const form = reactive({ title: '', price: '', categoryId: null, condition: '', description: '', tags: [], isOriginal: 1, isFreeShip: 0, images: [] });
+
+        function toggleTag(t) {
+            const idx = form.tags.indexOf(t);
+            if (idx >= 0) form.tags.splice(idx, 1);
+            else form.tags.push(t);
+        }
+
+        async function fetchPriceRef() {
+            priceRef.loaded = false;
+            if (!form.categoryId) { priceRef.count = 0; return; }
+            try {
+                const res = await itemApi.priceRef({ categoryId: form.categoryId });
+                Object.assign(priceRef, res.data || {}, { loaded: true });
+            } catch (e) { priceRef.loaded = true; priceRef.count = 0; }
+        }
+
+        async function onPick(e) {
+            const files = Array.from(e.target.files || []);
+            for (const f of files) {
+                if (form.images.length >= 9) break;
+                try {
+                    const res = await uploadApi.uploadImage(f);
+                    form.images.push(res.data.url);
+                } catch (err) { showToast(err.message); }
+            }
+            e.target.value = '';
+        }
+        function removeImg(i) { form.images.splice(i, 1); }
+
+        async function loadEdit() {
+            if (!editId.value) return;
+            try {
+                const res = await itemApi.getById(editId.value);
+                const d = res.data;
+                form.title = d.title;
+                form.price = d.price;
+                form.categoryId = d.categoryId;
+                form.condition = d.condition;
+                form.description = d.description;
+                form.tags = (d.tags || '').split(',').filter(x => x);
+                form.isOriginal = d.isOriginal == null ? 1 : d.isOriginal;
+                form.isFreeShip = d.isFreeShip == null ? 0 : d.isFreeShip;
+                form.images = (d.images || []).map(x => x.url || x);
+                if (form.categoryId) fetchPriceRef();
+            } catch (e) { showToast(e.message); }
+        }
+
+        async function submit() {
+            if (!requireLogin(router)) return;
+            if (!form.title.trim()) return showToast('请填写标题');
+            if (!form.price || parseFloat(form.price) <= 0) return showToast('请填写正确价格');
+            submitting.value = true;
+            try {
+                const payload = {
+                    title: form.title, price: parseFloat(form.price),
+                    categoryId: form.categoryId, condition: form.condition,
+                    tags: form.tags.join(','),
+                    isOriginal: form.isOriginal, isFreeShip: form.isFreeShip,
+                    description: form.description, images: form.images
+                };
+                if (editId.value) {
+                    await itemApi.update(editId.value, payload);
+                    showToast('修改成功');
+                } else {
+                    await itemApi.create(payload);
+                    if (typeof celebrate === 'function') celebrate();
+                    showToast('发布成功');
+                }
+                router.push('/my-items');
+            } catch (e) { showToast(e.message); }
+            submitting.value = false;
+        }
+
+        onMounted(() => { store.loadCategories(); loadEdit(); });
+        watch(() => form.categoryId, () => { fetchPriceRef(); });
+        return { editId, form, submitting, onPick, removeImg, submit, store, tagOptions, priceRef, toggleTag, fetchPriceRef, imgUrl: getImageUrl, fmtPrice };
+    }
+};
+
+// ===================== 我的商品 =====================
+const MyItems = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">我的发布</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!items.length" class="empty-state">
+            <div class="icon"><i class="fa fa-shopping-bag"></i></div>
+            <div class="text">您还没有发布过商品</div>
+            <button class="btn btn-primary" style="margin-top:16px;" @click="$router.push('/publish')">去发布</button>
+        </div>
+        <div v-else>
+            <div class="my-item-card liquid-card" v-for="it in items" :key="it.id">
+                <img :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr" @click="$router.push('/item/'+it.id)">
+                <div class="my-item-info">
+                    <div>
+                        <div class="my-item-title" @click="$router.push('/item/'+it.id)">{{it.title}}</div>
+                        <div class="my-item-status" :class="statusClass(it.status)">● {{it.status}}</div>
+                    </div>
+                    <div class="my-item-bottom">
+                        <div class="my-item-price">¥{{fmtPrice(it.price)}}</div>
+                        <div class="my-item-actions">
+                            <button class="btn btn-sm btn-outline" v-if="it.status!=='已售'" @click="edit(it.id)">编辑</button>
+                            <button class="btn btn-sm btn-ghost" v-if="it.status==='在售'" @click="offline(it.id)">下架</button>
+                            <button class="btn btn-sm btn-outline" v-if="it.status==='下架'" @click="relaunch(it.id)">重新上架</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const router = useRouter();
+        const items = ref([]);
+        const loading = ref(true);
+
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await userApi.getMyItems();
+                // 后端返回 PageResult{total,page,size,data}，取内层 data 数组
+                items.value = (res.data && res.data.data) || res.data || [];
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+        function edit(id) { router.push('/publish/' + id); }
+        async function offline(id) {
+            if (!await showModal('确认下架', '下架后商品将不再展示在首页')) return;
+            try { await itemApi.delete(id); showToast('已下架'); load(); }
+            catch (e) { showToast(e.message); }
+        }
+        async function relaunch(id) {
+            try { await itemApi.relist(id); showToast('已重新上架'); load(); }
+            catch (e) { showToast(e.message); }
+        }
+        function statusClass(s) { return s === '在售' ? 'selling' : (s === '已售' ? 'sold' : 'down'); }
+
+        onMounted(load);
+        return { items, loading, edit, offline, relaunch, statusClass, imgUrl: getImageUrl, fmtPrice, onImgErr };
+    }
+};
+
+// ===================== 我的订单（买家） =====================
+const Orders = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">我买到的</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!orders.length" class="empty-state">
+            <div class="icon"><i class="fa fa-reorder"></i></div>
+            <div class="text">还没有订单</div>
+        </div>
+        <div v-else>
+            <div class="card order-card liquid-card" v-for="o in orders" :key="o.id">
+                <div class="order-header">
+                    <span class="order-no">订单号：{{o.orderNo}}</span>
+                    <span class="order-status" :class="statusClass(o.status)">{{o.status}}</span>
+                </div>
+                <div class="order-body" @click="$router.push('/item/'+o.itemId)">
+                    <img class="item-img" :src="imgUrl(o.itemImage)" @error="onImgErr">
+                    <div class="item-info">
+                        <div class="item-title">{{o.itemTitle || '商品已删除'}}</div>
+                        <div class="item-price">¥{{fmtPrice(o.price)}}</div>
+                    </div>
+                </div>
+                <div class="order-footer">
+                    <span class="order-no" v-if="o.courierCompany && o.status==='待收货'">快递：{{o.courierCompany}} {{o.trackingNo}} <template v-if="o.shippedAt">· {{fmtDateTime(o.shippedAt)}}</template></span>
+                    <button class="btn btn-sm btn-ghost" v-if="o.status==='待发货'" @click="cancel(o.id)">取消订单</button>
+                    <button class="btn btn-sm btn-primary" v-if="o.status==='待收货'" @click="confirm(o.id)">确认收货</button>
+                    <span class="order-no" v-if="o.status==='已完成'">实付 ¥{{fmtPrice(o.price)}}</span>
+                    <button class="btn btn-sm btn-ghost" @click="showDetail(o.id)">详情</button>
+                </div>
+            </div>
+        </div>
+        <!-- 订单详情弹窗 -->
+        <div class="modal-overlay" v-if="showDetailModal" @click.self="showDetailModal=false">
+            <div class="modal-box" style="max-width:360px;">
+                <h3>订单详情</h3>
+                <div style="text-align:left;font-size:13px;color:#333;line-height:1.8;" v-if="orderDetail">
+                    <p>订单号：{{orderDetail.orderNo}}</p>
+                    <p>状态：<span :class="statusClass(orderDetail.status)">{{orderDetail.status}}</span></p>
+                    <p>价格：¥{{fmtPrice(orderDetail.price)}}</p>
+                    <p>佣金：¥{{fmtPrice(orderDetail.commission)}}</p>
+                    <p>卖家收入：¥{{fmtPrice(orderDetail.sellerIncome)}}</p>
+                    <p>收货人：{{orderDetail.receiverName}}</p>
+                    <p>电话：{{orderDetail.receiverPhone}}</p>
+                    <p>地址：{{orderDetail.receiverAddress}}</p>
+                    <template v-if="orderDetail.courierCompany || orderDetail.trackingNo">
+                        <p>快递公司：{{orderDetail.courierCompany}}</p>
+                        <p>运单号：{{orderDetail.trackingNo}}</p>
+                        <p v-if="orderDetail.shippedAt">发货时间：{{fmtDateTime(orderDetail.shippedAt)}}</p>
+                    </template>
+                    <p v-if="orderDetail.completedAt">完成时间：{{fmtDateTime(orderDetail.completedAt)}}</p>
+                </div>
+                <button class="btn btn-primary" style="margin-top:12px;" @click="showDetailModal=false">关闭</button>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const router = useRouter();
+        const orders = ref([]);
+        const loading = ref(true);
+        const orderDetail = ref(null);
+        const showDetailModal = ref(false);
+
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await orderApi.getBuyerOrders();
+                orders.value = res.data || [];
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+        async function cancel(id) {
+            if (!await showModal('取消订单', '确认取消该订单吗？')) return;
+            try { await orderApi.cancel(id); showToast('已取消'); load(); }
+            catch (e) { showToast(e.message); }
+        }
+        async function confirm(id) {
+            if (!await showModal('确认收货', '确认收货后将结算给卖家')) return;
+            try {
+                await orderApi.confirm(id);
+                if (typeof celebrate === 'function') celebrate();
+                showToast('确认收货成功'); load();
+            } catch (e) { showToast(e.message); }
+        }
+        async function showDetail(id) {
+            try {
+                const res = await orderApi.getById(id);
+                orderDetail.value = res.data || res;
+                showDetailModal.value = true;
+            } catch (e) { showToast(e.message); }
+        }
+        function statusClass(s) {
+            return { '待发货': 'pending', '待收货': 'shipped', '已完成': 'done', '已取消': 'cancelled' }[s] || '';
+        }
+        onMounted(load);
+        return { orders, loading, orderDetail, showDetailModal, cancel, confirm, showDetail, statusClass, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
+    }
+};
+
+// ===================== 卖单管理（卖家） =====================
+const Sales = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">我卖出的</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!orders.length" class="empty-state">
+            <div class="icon"><i class="fa fa-reorder"></i></div>
+            <div class="text">还没有卖单</div>
+        </div>
+        <div v-else>
+            <div class="card order-card liquid-card" v-for="o in orders" :key="o.id">
+                <div class="order-header">
+                    <span class="order-no">{{o.orderNo}}</span>
+                    <span class="order-status" :class="statusClass(o.status)">{{o.status}}</span>
+                </div>
+                <div class="order-body" @click="$router.push('/item/'+o.itemId)">
+                    <img class="item-img" :src="imgUrl(o.itemImage)" @error="onImgErr">
+                    <div class="item-info">
+                        <div class="item-title">{{o.itemTitle}}</div>
+                        <div class="item-price">¥{{fmtPrice(o.price)}}</div>
+                    </div>
+                </div>
+                <div class="order-footer" style="flex-direction:column;align-items:flex-end;gap:4px;">
+                    <span class="order-no">买家：{{o.receiverName}} {{o.receiverPhone}}</span>
+                    <span class="order-no">地址：{{o.receiverAddress}}</span>
+                    <span class="order-no" v-if="o.courierCompany && (o.status==='待收货'||o.status==='已完成')">快递：{{o.courierCompany}} {{o.trackingNo}} <template v-if="o.shippedAt">· {{fmtDateTime(o.shippedAt)}}</template></span>
+                    <div style="margin-top:6px;">
+                        <button class="btn btn-sm btn-primary" v-if="o.status==='待发货'" @click="ship(o.id)">发货</button>
+                        <span class="order-no" v-if="o.status==='已完成'">实收 ¥{{fmtPrice(o.sellerIncome)}}（含佣金 ¥{{fmtPrice(o.commission)}}）<template v-if="o.completedAt"> · {{fmtDateTime(o.completedAt)}}</template></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const orders = ref([]);
+        const loading = ref(true);
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await orderApi.getSellerOrders();
+                orders.value = res.data || [];
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+        async function ship(id) {
+            const info = await showShipModal();
+            if (!info) return;
+            try { await orderApi.ship(id, info); showToast('已发货'); load(); }
+            catch (e) { showToast(e.message); }
+        }
+        function statusClass(s) {
+            return { '待发货': 'pending', '待收货': 'shipped', '已完成': 'done', '已取消': 'cancelled' }[s] || '';
+        }
+        function showShipModal() {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.innerHTML = [
+                    '<div class="modal-box" style="max-width:340px;">',
+                    '<h3>确认发货</h3>',
+                    '<p style="text-align:left;color:#666;font-size:13px;margin-bottom:10px;">请填写物流信息，方便买家跟踪包裹。</p>',
+                    '<label class="field-label" style="font-size:13px;">快递公司</label>',
+                    '<input class="field-input" id="shipCourier" placeholder="如：顺丰速运" style="width:100%;box-sizing:border-box;margin-bottom:10px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;">',
+                    '<label class="field-label" style="font-size:13px;">运单号</label>',
+                    '<input class="field-input" id="shipTracking" placeholder="请输入运单号" style="width:100%;box-sizing:border-box;margin-bottom:14px;padding:8px 10px;border:1px solid #ddd;border-radius:8px;">',
+                    '<div class="modal-actions">',
+                    '<button class="btn btn-ghost">取消</button>',
+                    '<button class="btn btn-primary">发货</button>',
+                    '</div></div>'
+                ].join('');
+                document.body.appendChild(overlay);
+                const courier = overlay.querySelector('#shipCourier');
+                const tracking = overlay.querySelector('#shipTracking');
+                const close = () => { overlay.remove(); resolve(null); };
+                overlay.querySelector('.btn-ghost').onclick = close;
+                overlay.querySelector('.btn-primary').onclick = function() {
+                    const c = (courier.value || '').trim();
+                    const t = (tracking.value || '').trim();
+                    if (!t) { showToast('请填写运单号'); return; }
+                    overlay.remove();
+                    resolve({ courierCompany: c, trackingNo: t });
+                };
+                overlay.onclick = function(e) { if (e.target === overlay) close(); };
+                courier.focus();
+            });
+        }
+        onMounted(load);
+        return { orders, loading, ship, statusClass, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
+    }
+};
+
+// ===================== 消息会话列表 =====================
+const Messages = {
+    template: `
+    <div class="page">
+        <div class="navbar glass">
+            <div class="navbar-back"></div>
+            <div class="navbar-title">消息</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!sessions.length" class="empty-state">
+            <div class="icon"><i class="fa fa-comments-o"></i></div>
+            <div class="text">还没有聊天消息</div>
+            <div class="sub">在商品详情页联系卖家即可发起聊天</div>
+        </div>
+        <div v-else>
+            <div class="chat-list-item liquid-card" v-for="s in sessions" :key="s.userId" @click="$router.push('/chat/'+s.userId)">
+                <div class="chat-list-avatar">
+                    <img v-if="s.avatar" :src="imgUrl(s.avatar)">
+                    <i v-else class="fa fa-user"></i>
+                </div>
+                <div class="chat-list-info">
+                    <div class="chat-list-name">{{s.nickname || s.username}}</div>
+                    <div class="chat-list-preview">{{s.lastContent}}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                    <span class="chat-list-time">{{shortTime(s.lastTime)}}</span>
+                    <span class="unread-badge" v-if="s.unread">{{s.unread}}</span>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const sessions = ref([]);
+        const loading = ref(true);
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await messageApi.getSessions();
+                sessions.value = res.data || [];
+                store.refreshUnread();
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+        onMounted(load);
+        onActivated(load);
+        return { sessions, loading, imgUrl: getImageUrl, shortTime: formatTime };
+    }
+};
+
+// ===================== 聊天室 =====================
+const Chat = {
+    template: `
+    <div class="chat-room">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.back()"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">{{other.nickname || other.username || '聊天'}}</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div class="chat-messages" ref="msgBox">
+            <div v-for="m in messages" :key="m.id" style="display:flex;flex-direction:column;">
+                <div class="chat-msg" :class="m.fromUserId===myId ? 'chat-msg-self' : 'chat-msg-other'">{{m.content}}</div>
+            </div>
+            <div class="empty-state" v-if="!messages.length" style="padding:30px;">
+                <div class="text">发送一条消息开始对话吧</div>
+            </div>
+        </div>
+        <div class="chat-quick" v-if="quickPhrases.length">
+            <span class="quick-chip" v-for="q in quickPhrases" :key="q" @click="useQuick(q)">{{q}}</span>
+        </div>
+        <div class="chat-input">
+            <input v-model="text" placeholder="输入消息..." @keyup.enter="send">
+            <div class="send-btn" :class="{'btn-disabled':!text.trim()}" @click="send"><i class="fa fa-paper-plane"></i></div>
+        </div>
+    </div>`,
+    setup() {
+        const route = useRoute();
+        const router = useRouter();
+        const otherUserId = route.params.userId;
+        const itemId = route.params.itemId || null;
+        const messages = ref([]);
+        const other = reactive({});
+        const text = ref('');
+        const msgBox = ref(null);
+        const quickPhrases = [
+            '你好，请问这个宝贝还在吗？',
+            '可以便宜一点吗？',
+            '请问实物和图片一致吗？',
+            '可以当面交易/自提吗？',
+            '支持包邮吗？',
+            '好的，谢谢'
+        ];
+        const myId = computed(() => store.user && store.user.id);
+        let timer = null;
+
+        function useQuick(q) { text.value = q; }
+
+        async function load() {
+            try {
+                const res = await messageApi.getChat({ otherUserId, itemId });
+                messages.value = res.data || [];
+                // 标记已读
+                messageApi.markRead({ otherUserId }).then(() => store.refreshUnread()).catch(() => {});
+                scrollToBottom();
+                // 对方信息
+                if (!other.username) {
+                    try {
+                        const s = await messageApi.getSessions();
+                        const found = (s.data || []).find(x => x.userId === otherUserId);
+                        if (found) Object.assign(other, found);
+                    } catch (e) {}
+                }
+            } catch (e) { showToast(e.message); }
+        }
+        async function send() {
+            if (!text.value.trim()) return;
+            if (!requireLogin(router)) return;
+            try {
+                await messageApi.send({ toUserId: otherUserId, content: text.value, itemId });
+                text.value = '';
+                load();
+            } catch (e) { showToast(e.message); }
+        }
+        function scrollToBottom() {
+            nextTick(() => { if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight; });
+        }
+        onMounted(() => { load(); timer = setInterval(load, 5000); });
+        onUnmounted(() => { if (timer) clearInterval(timer); });
+        return { messages, other, text, send, msgBox, myId, quickPhrases, useQuick };
+    }
+};
+
+// ===================== 收藏列表 =====================
+const Favorites = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">我的收藏</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!list.length" class="empty-state">
+            <div class="icon"><i class="fa fa-heart-o"></i></div>
+            <div class="text">还没有收藏商品</div>
+        </div>
+        <div v-else>
+            <div class="fav-item liquid-card" v-for="it in list" :key="it.id">
+                <img :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr" @click="$router.push('/item/'+it.id)">
+                <div class="fav-info" @click="$router.push('/item/'+it.id)">
+                    <div class="fav-title">{{it.title}}</div>
+                    <div class="fav-bottom">
+                        <div class="fav-price">¥{{fmtPrice(it.price)}}</div>
+                        <span class="fav-time">{{it.status}}</span>
+                    </div>
+                </div>
+                <div class="fav-unfav" @click="unfav(it.id)"><i class="fa fa-trash-o"></i></div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const list = ref([]);
+        const loading = ref(true);
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await favoriteApi.getList();
+                list.value = res.data || [];
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+        async function unfav(id) {
+            try { await favoriteApi.remove(id); showToast('已取消收藏'); load(); }
+            catch (e) { showToast(e.message); }
+        }
+        onMounted(load);
+        return { list, loading, unfav, imgUrl: getImageUrl, fmtPrice, onImgErr };
+    }
+};
+
+// ===================== 个人中心 =====================
+const Profile = {
+    template: `
+    <div class="page">
+        <div class="profile-header">
+            <div class="profile-avatar" @click="pickAvatar">
+                <img v-if="store.user && store.user.avatar" :src="imgUrl(store.user.avatar)">
+                <i v-else class="fa fa-user"></i>
+            </div>
+            <input type="file" ref="avatarInput" accept="image/*" style="display:none;" @change="onAvatarPick">
+            <div class="profile-info">
+                <div v-if="store.user">
+                    <div class="profile-name">{{store.user.nickname || store.user.username}}</div>
+                    <div class="profile-phone">{{store.user.phone || ''}}</div>
+                    <div class="profile-stats">
+                        <div class="profile-stat"><div class="profile-stat-num">¥{{balance}}</div><div class="profile-stat-label">余额</div></div>
+                        <div class="profile-stat"><div class="profile-stat-num">{{store.user.role==='ADMIN'?'管理员':'普通用户'}}</div><div class="profile-stat-label">身份</div></div>
+                    </div>
+                    <div style="margin-top:10px;display:flex;gap:10px;">
+                        <button class="btn btn-sm" style="background:rgba(255,255,255,0.25);color:#fff;" @click="openWithdraw">提现</button>
+                        <button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;" @click="go('/wallet')">账单明细</button>
+                    </div>
+                </div>
+                <div v-else class="profile-name" @click="$router.push('/login')">点击登录 / 注册</div>
+            </div>
+        </div>
+        <div class="profile-menu" v-if="store.user">
+            <div class="profile-menu-item" @click="go('/my-items')"><span class="profile-menu-icon"><i class="fa fa-shopping-bag"></i></span><span class="profile-menu-text">我的发布</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" @click="go('/orders')"><span class="profile-menu-icon"><i class="fa fa-reorder"></i></span><span class="profile-menu-text">我买到的</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" @click="go('/sales')"><span class="profile-menu-icon"><i class="fa fa-money"></i></span><span class="profile-menu-text">我卖出的</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" @click="go('/favorites')"><span class="profile-menu-icon"><i class="fa fa-heart"></i></span><span class="profile-menu-text">我的收藏</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" @click="editProfile"><span class="profile-menu-icon"><i class="fa fa-cog"></i></span><span class="profile-menu-text">修改资料</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" @click="changePwd"><span class="profile-menu-icon"><i class="fa fa-lock"></i></span><span class="profile-menu-text">修改密码</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" v-if="store.user.role==='ADMIN'" @click="toAdmin"><span class="profile-menu-icon"><i class="fa fa-shield"></i></span><span class="profile-menu-text">管理后台</span><span class="profile-menu-arrow">›</span></div>
+        </div>
+        <button class="btn btn-block btn-lg btn-outline profile-logout" style="margin:20px 16px;width:auto;" v-if="store.user" @click="logout">退出登录</button>
+
+        <!-- 修改资料弹窗 -->
+        <div class="modal-overlay" v-if="showEdit">
+            <div class="modal-box" style="max-width:340px;">
+                <h3>修改资料</h3>
+                <div class="form-group" style="margin-top:12px;"><label>昵称</label><input v-model="editForm.nickname"></div>
+                <div class="form-group"><label>手机号</label><input v-model="editForm.phone"></div>
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button class="btn btn-ghost" @click="showEdit=false">取消</button>
+                    <button class="btn btn-primary" @click="saveProfile">保存</button>
+                </div>
+            </div>
+        </div>
+        <!-- 提现弹窗 -->
+        <div class="modal-overlay" v-if="showWithdraw">
+            <div class="modal-box" style="max-width:340px;">
+                <h3>余额提现</h3>
+                <div class="fee-hint" style="color:#999;border:none;">当前余额 ¥{{balance}}</div>
+                <div class="form-group" style="margin-top:12px;"><label>提现金额</label><input type="number" step="0.01" v-model="withdrawAmount" placeholder="请输入提现金额"></div>
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button class="btn btn-ghost" @click="showWithdraw=false">取消</button>
+                    <button class="btn btn-primary" :class="{'btn-disabled':withdrawing}" @click="submitWithdraw">确认提现</button>
+                </div>
+            </div>
+        </div>
+        <!-- 修改密码弹窗 -->
+        <div class="modal-overlay" v-if="showPwd">
+            <div class="modal-box" style="max-width:340px;">
+                <h3>修改密码</h3>
+                <div class="fee-hint" style="color:#999;">需至少8位，含大小写字母和数字</div>
+                <div class="form-group" style="margin-top:12px;"><label>原密码</label><input type="password" v-model="pwdForm.oldPassword"></div>
+                <div class="form-group"><label>新密码</label><input type="password" v-model="pwdForm.newPassword"></div>
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button class="btn btn-ghost" @click="showPwd=false">取消</button>
+                    <button class="btn btn-primary" @click="savePwd">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const router = useRouter();
+        const showEdit = ref(false);
+        const showPwd = ref(false);
+        const showWithdraw = ref(false);
+        const withdrawAmount = ref('');
+        const withdrawing = ref(false);
+        const avatarInput = ref(null);
+        const editForm = reactive({ nickname: '', phone: '' });
+        const pwdForm = reactive({ oldPassword: '', newPassword: '' });
+        const balance = computed(() => (store.user && store.user.balance ? parseFloat(store.user.balance).toFixed(2) : '0.00'));
+
+        function go(p) { router.push(p); }
+        function toAdmin() { window.open('admin.html', '_blank'); }
+        function refreshUser() {
+            if (isLoggedIn()) {
+                authApi.getInfo().then(res => { if (res.data) store.setUser(res.data); }).catch(() => {});
+            }
+        }
+        function pickAvatar() {
+            if (!requireLogin(router)) return;
+            if (avatarInput.value) avatarInput.value.click();
+        }
+        async function onAvatarPick(e) {
+            const f = e.target.files && e.target.files[0];
+            e.target.value = '';
+            if (!f) return;
+            try {
+                const res = await userApi.uploadAvatar(f);
+                const d = res.data;
+                const url = typeof d === 'string' ? d : (d.url || d.avatar);
+                if (url) store.setUser({ ...store.user, avatar: url });
+                showToast('头像已更新');
+            } catch (err) { showToast(err.message); }
+        }
+        function openWithdraw() {
+            if (!requireLogin(router)) return;
+            withdrawAmount.value = '';
+            showWithdraw.value = true;
+        }
+        async function submitWithdraw() {
+            const amt = parseFloat(withdrawAmount.value);
+            const bal = parseFloat((store.user && store.user.balance) || 0);
+            if (!amt || amt <= 0) return showToast('请输入正确的提现金额');
+            if (amt > bal) return showToast('提现金额不能超过余额');
+            withdrawing.value = true;
+            try {
+                await userApi.withdraw({ amount: amt });
+                showToast('提现成功');
+                showWithdraw.value = false;
+                refreshUser();
+            } catch (e) { showToast(e.message); }
+            withdrawing.value = false;
+        }
+        function editProfile() {
+            if (!requireLogin(router)) return;
+            editForm.nickname = store.user.nickname || '';
+            editForm.phone = store.user.phone || '';
+            showEdit.value = true;
+        }
+        async function saveProfile() {
+            try { await userApi.updateProfile(editForm); showToast('保存成功'); store.setUser({ ...store.user, ...editForm }); showEdit.value = false; }
+            catch (e) { showToast(e.message); }
+        }
+        function changePwd() {
+            if (!requireLogin(router)) return;
+            pwdForm.oldPassword = ''; pwdForm.newPassword = '';
+            showPwd.value = true;
+        }
+        async function savePwd() {
+            try { await userApi.updatePassword(pwdForm); showToast('修改成功，请重新登录'); logout(); }
+            catch (e) { showToast(e.message); }
+        }
+        function logout() {
+            authApi.logout().catch(() => {});
+            localStorage.removeItem('token');
+            store.setUser(null);
+            showToast('已退出');
+            router.push('/home');
+        }
+        onMounted(() => {
+            // 若已登录，刷新一次最新用户信息
+            refreshUser();
+        });
+        return { store, balance, go, toAdmin, editProfile, showEdit, editForm, saveProfile,
+                 changePwd, showPwd, pwdForm, savePwd, logout, imgUrl: getImageUrl,
+                 pickAvatar, onAvatarPick, avatarInput,
+                 showWithdraw, withdrawAmount, withdrawing, openWithdraw, submitWithdraw };
+    }
+};
+
+// ===================== 资金明细 =====================
+const Wallet = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">资金明细</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!flows.length" class="empty-state">
+            <div class="icon"><i class="fa fa-file-text-o"></i></div>
+            <div class="text">暂无资金流水</div>
+        </div>
+        <div v-else style="padding-bottom:20px;">
+            <div class="card liquid-card" v-for="f in flows" :key="f.id" style="margin:12px 16px 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:600;color:#333;">
+                        {{typeText(f.type)}}
+                        <span v-if="f.orderId" style="font-size:11px;color:#999;font-weight:400;margin-left:6px;">订单 #{{f.orderId}}</span>
+                    </div>
+                    <div style="font-size:12px;color:#999;margin-top:4px;" v-if="f.remark">{{f.remark}}</div>
+                    <div style="font-size:11px;color:#bbb;margin-top:4px;">{{shortTime(f.createdAt)}}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+                    <div :style="{fontSize:'16px',fontWeight:700,color:isIncome(f)?'#FF6B35':'#00b894'}">{{isIncome(f)?'+':'-'}}¥{{fmtPrice(f.amount)}}</div>
+                    <div style="font-size:11px;color:#999;margin-top:3px;">余额 ¥{{fmtPrice(f.balance)}}</div>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const flows = ref([]);
+        const loading = ref(true);
+        async function load() {
+            loading.value = true;
+            try {
+                const res = await userApi.getFundFlows();
+                flows.value = res.data || [];
+            } catch (e) { showToast(e.message); }
+            loading.value = false;
+        }
+        function typeText(t) {
+            return { INCOME: '收入', EXPENSE: '支出', WITHDRAW: '提现', RECHARGE: '充值' }[t] || t;
+        }
+        function isIncome(f) { return f.type === 'INCOME' || f.type === 'RECHARGE'; }
+        onMounted(load);
+        return { flows, loading, typeText, isIncome, fmtPrice, shortTime: formatTime };
+    }
+};
+
+// ===================== 路由守卫 & 工具 =====================
+function requireLogin(router) {
+    if (!isLoggedIn()) {
+        showToast('请先登录');
+        router.push('/login');
+        return false;
+    }
+    return true;
+}
+function onImgErr(e) { e.target.style.opacity = 0.3; }
+
+const routes = [
+    { path: '/', redirect: '/home' },
+    { path: '/home', component: Home, meta: { tab: 'home' } },
+    { path: '/item/:id', component: ItemDetail },
+    { path: '/publish', component: Publish, meta: { requireAuth: true } },
+    { path: '/publish/:id', component: Publish, meta: { requireAuth: true } },
+    { path: '/my-items', component: MyItems, meta: { requireAuth: true } },
+    { path: '/orders', component: Orders, meta: { requireAuth: true } },
+    { path: '/sales', component: Sales, meta: { requireAuth: true } },
+    { path: '/messages', component: Messages, meta: { requireAuth: true, tab: 'message' } },
+    { path: '/chat/:userId', component: Chat, meta: { requireAuth: true } },
+    { path: '/chat/:userId/:itemId', component: Chat, meta: { requireAuth: true } },
+    { path: '/favorites', component: Favorites, meta: { requireAuth: true } },
+    { path: '/wallet', component: Wallet, meta: { requireAuth: true } },
+    { path: '/profile', component: Profile, meta: { tab: 'profile' } },
+    { path: '/login', component: {
+        template: '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;"><a href="login.html" class="btn btn-primary btn-lg">前往登录页</a></div>'
+    }}
+];
+
+const router = createRouter({
+    history: createWebHashHistory(),
+    routes,
+    scrollBehavior() { return { top: 0 }; }
+});
+
+router.beforeEach((to, from, next) => {
+    if (to.meta.requireAuth && !isLoggedIn()) {
+        showToast('请先登录');
+        next('/login');
+    } else { next(); }
+});
+
+// 根组件
+const app = {
+    setup() {
+        const route = useRoute();
+        const showTabbar = computed(() => ['home', 'message', 'profile', 'publish'].includes(route.meta.tab));
+        const currentTab = computed(() => route.meta.tab || '');
+        function goTab(p) {
+            if (!isLoggedIn() && (p === '/publish' || p === '/messages' || p === '/profile')) {
+                return router.push('/login');
+            }
+            router.push(p);
+        }
+        onMounted(() => { store.loadCategories(); store.refreshUnread(); });
+        return { showTabbar, currentTab, goTab, store, totalUnread: computed(() => store.totalUnread) };
+    }
+};
+
+createApp(app).use(router).mount('#app');
+</script>
+<style>
+.route-enter-active, .route-leave-active { transition: opacity .15s ease; }
+.route-enter-from, .route-leave-to { opacity: 0; }
+</style>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# ================================================
+# Profile: sqlite -- 使用 SQLite 文件数据库
+# 启动方式: mvnw spring-boot:run -Dspring-boot.run.profiles=sqlite
+# ================================================
+spring:
+  datasource:
+    url: jdbc:sqlite:D:/港湾跳蚤市场/gwtzsc.db
+    driver-class-name: org.sqlite.JDBC
+    # SQLite 不需要用户名密码
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-sqlite.sql
+      data-locations: classpath:db/data-sqlite.sql
+
+mybatis-plus:
+  configuration:
+    # 关闭 mybatis-plus 自动更新，SQLite 无 NOW() / ON UPDATE
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      # SQLite 自增主键
+      id-type: auto

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 港湾跳蚤市场</title>
+    <link href="lib/font-awesome/css/font-awesome.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/config.js"></script>
+    <script src="lib/axios.min.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/effects.js"></script>
+    <!-- 管理后台样式由 css/style.css 统一提供，已升级为深色玻璃拟态风格 -->
+</head>
+<body>
+<div id="adminApp" class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="admin-logo"><i class="fa fa-shield"></i> 管理后台</div>
+        <nav class="admin-nav">
+            <div class="admin-nav-item" :class="{active: tab==='dashboard'}" @click="tab='dashboard'">
+                <i class="fa fa-dashboard"></i> 数据概览
+            </div>
+            <div class="admin-nav-item" :class="{active: tab==='users'}" @click="tab='users'">
+                <i class="fa fa-users"></i> 用户管理
+            </div>
+            <div class="admin-nav-item" :class="{active: tab==='items'}" @click="tab='items'">
+                <i class="fa fa-shopping-bag"></i> 商品管理
+            </div>
+            <div class="admin-nav-item" :class="{active: tab==='orders'}" @click="tab='orders'">
+                <i class="fa fa-reorder"></i> 订单监控
+            </div>
+            <div class="admin-nav-item" :class="{active: tab==='revenue'}" @click="tab='revenue'">
+                <i class="fa fa-bar-chart"></i> 收入统计
+            </div>
+            <div class="admin-nav-item" :class="{active: tab==='categories'}" @click="tab='categories'">
+                <i class="fa fa-tags"></i> 分类管理
+            </div>
+        </nav>
+        <div class="admin-nav-bottom">
+            <div class="admin-nav-item" @click="backHome"><i class="fa fa-home"></i> 返回首页</div>
+            <div class="admin-nav-item" @click="logout"><i class="fa fa-sign-out"></i> 退出登录</div>
+        </div>
+    </aside>
+
+    <main class="admin-main">
+        <div class="admin-topbar">
+            <div class="admin-title">{{tabTitle}}</div>
+            <div class="admin-user">{{store.user ? (store.user.nickname || store.user.username) : '未登录'}}</div>
+        </div>
+        <div class="admin-content">
+            <!-- 数据概览 -->
+            <div v-if="tab==='dashboard'">
+                <div class="stat-grid">
+                    <div class="stat-card" style="--c:#FF6B35;--c-bg:#fff3ec;">
+                        <div><div class="stat-num">{{stats.userCount}}</div><div class="stat-label">注册用户</div></div>
+                        <div class="stat-icon"><i class="fa fa-users"></i></div>
+                    </div>
+                    <div class="stat-card" style="--c:#3498DB;--c-bg:#ebf5fb;">
+                        <div><div class="stat-num">{{stats.itemCount}}</div><div class="stat-label">商品总数</div></div>
+                        <div class="stat-icon"><i class="fa fa-shopping-bag"></i></div>
+                    </div>
+                    <div class="stat-card" style="--c:#2ECC71;--c-bg:#eafaf1;">
+                        <div><div class="stat-num">{{stats.orderCount}}</div><div class="stat-label">订单总数</div></div>
+                        <div class="stat-icon"><i class="fa fa-reorder"></i></div>
+                    </div>
+                    <div class="stat-card" style="--c:#E74C3C;--c-bg:#fdedec;">
+                        <div><div class="stat-num">¥{{fmt(stats.totalCommission)}}</div><div class="stat-label">累计佣金</div></div>
+                        <div class="stat-icon"><i class="fa fa-money"></i></div>
+                    </div>
+                    <div class="stat-card" style="--c:#9B59B6;--c-bg:#f5eef8;">
+                        <div><div class="stat-num">¥{{fmt(stats.todayCommission)}}</div><div class="stat-label">今日佣金</div></div>
+                        <div class="stat-icon"><i class="fa fa-calendar"></i></div>
+                    </div>
+                    <div class="stat-card" style="--c:#F39C12;--c-bg:#fef5e7;">
+                        <div><div class="stat-num">{{stats.todayOrders}}</div><div class="stat-label">今日订单</div></div>
+                        <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户管理 -->
+            <div v-if="tab==='users'">
+                <div class="admin-search">
+                    <input v-model="userKw" placeholder="搜索用户名/昵称" @keyup.enter="loadUsers(1)">
+                    <button class="btn btn-primary" @click="loadUsers(1)"><i class="fa fa-search"></i></button>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>ID</th><th>用户名</th><th>昵称</th><th>手机号</th><th>余额</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr v-for="u in users" :key="u.id">
+                                <td>{{u.id}}</td><td>{{u.username}}</td><td>{{u.nickname||'-'}}</td><td>{{u.phone||'-'}}</td>
+                                <td>¥{{fmt(u.balance)}}</td>
+                                <td><span class="admin-badge" :class="u.role==='ADMIN'?'badge-admin':'badge-on'">{{u.role}}</span></td>
+                                <td><span class="admin-badge" :class="u.status===1?'badge-on':'badge-off'">{{u.status===1?'正常':'禁用'}}</span></td>
+                                <td>{{shortTime(u.createdAt)}}</td>
+                                <td class="admin-actions">
+                                    <button class="btn btn-sm btn-primary" @click="openBalance(u)"><i class="fa fa-yen"></i> 设余额</button>
+                                    <button class="btn btn-sm btn-primary" v-if="u.status===0 && u.role!=='ADMIN'" @click="setUserStatus(u.id,1)">启用</button>
+                                    <button class="btn btn-sm btn-ghost" v-if="u.status===1 && u.role!=='ADMIN'" @click="setUserStatus(u.id,0)">禁用</button>
+                                    <button class="btn btn-sm btn-danger" v-if="u.role!=='ADMIN'" @click="deleteUser(u.id)">删除</button>
+                                </td>
+                            </tr>
+                            <tr v-if="!users.length"><td colspan="9" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无用户</div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="admin-pager">
+                    <button :disabled="userPage<=1" @click="loadUsers(userPage-1)">上一页</button>
+                    <span>{{userPage}} / {{userTotalPages||1}}</span>
+                    <button :disabled="userPage>=userTotalPages" @click="loadUsers(userPage+1)">下一页</button>
+                </div>
+                <!-- 设置余额弹窗 -->
+                <div class="modal-overlay" v-if="showBalanceForm" @click.self="showBalanceForm=false">
+                    <div class="modal-box" style="max-width:360px;">
+                        <h3>设置用户余额</h3>
+                        <p style="text-align:left;color:#666;font-size:13px;margin:8px 0 4px;">用户：{{balanceUser ? (balanceUser.nickname || balanceUser.username) : ''}}（当前余额 ¥{{fmt(balanceUser?balanceUser.balance:0)}}）</p>
+                        <div class="form-group" style="margin-top:10px;"><label>设置余额</label><input v-model="balanceValue" type="number" min="0" step="0.01" placeholder="请输入新余额"></div>
+                        <div class="modal-actions" style="margin-top:16px;">
+                            <button class="btn btn-ghost" @click="showBalanceForm=false">取消</button>
+                            <button class="btn btn-primary" :class="{'btn-disabled':balanceSubmitting}" @click="submitBalance">{{balanceSubmitting ? '提交中...' : '保存'}}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 商品管理 -->
+            <div v-if="tab==='items'">
+                <div class="admin-search">
+                    <input v-model="itemKw" placeholder="搜索商品标题" @keyup.enter="loadItems(1)">
+                    <select v-model="itemStatus" @change="loadItems(1)">
+                        <option value="">全部状态</option><option>在售</option><option>已售</option><option>下架</option>
+                    </select>
+                    <button class="btn btn-primary" @click="loadItems(1)"><i class="fa fa-search"></i></button>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>ID</th><th>商品</th><th>卖家</th><th>价格</th><th>成色</th><th>状态</th><th>浏览</th><th>发布时间</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr v-for="it in items" :key="it.id">
+                                <td>{{it.id}}</td>
+                                <td class="td-title">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <img v-if="it.mainImage" :src="imgUrl(it.mainImage)" style="width:36px;height:36px;border-radius:6px;object-fit:cover;">
+                                        {{it.title}}
+                                    </div>
+                                </td>
+                                <td>{{it.sellerName}}</td><td>¥{{fmt(it.price)}}</td><td>{{it.condition||'-'}}</td>
+                                <td><span class="admin-badge" :class="it.status==='在售'?'badge-on':(it.status==='已售'?'badge-admin':'badge-off')">{{it.status}}</span></td>
+                                <td>{{it.views}}</td><td>{{shortTime(it.createdAt)}}</td>
+                                <td class="admin-actions">
+                                    <button class="btn btn-sm btn-danger" v-if="it.status==='在售'" @click="offline(it.id)">下架</button>
+                                    <button class="btn btn-sm btn-primary" v-if="it.status==='下架'" @click="relist(it.id)">重新上架</button>
+                                </td>
+                            </tr>
+                            <tr v-if="!items.length"><td colspan="9" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无商品</div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="admin-pager">
+                    <button :disabled="itemPage<=1" @click="loadItems(itemPage-1)">上一页</button>
+                    <span>{{itemPage}} / {{itemTotalPages||1}}</span>
+                    <button :disabled="itemPage>=itemTotalPages" @click="loadItems(itemPage+1)">下一页</button>
+                </div>
+            </div>
+
+            <!-- 订单监控 -->
+            <div v-if="tab==='orders'">
+                <div class="admin-search">
+                    <input v-model="orderKw" placeholder="搜订单号/收货人/电话" @keyup.enter="loadOrders(1)">
+                    <select v-model="orderStatus" @change="loadOrders(1)">
+                        <option value="">全部状态</option><option>待发货</option><option>待收货</option><option>已完成</option><option>已取消</option>
+                    </select>
+                    <button class="btn btn-primary" @click="loadOrders(1)"><i class="fa fa-search"></i></button>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>订单号</th><th>商品</th><th>卖家</th><th>买家</th><th>价格</th><th>佣金</th><th>卖家收入</th><th>状态</th><th>收货人</th><th>下单时间</th></tr></thead>
+                        <tbody>
+                            <tr v-for="o in orders" :key="o.id">
+                                <td>{{o.orderNo}}</td><td class="td-title">{{o.itemTitle}}</td><td>{{o.sellerName}}</td><td>{{o.buyerName}}</td>
+                                <td>¥{{fmt(o.price)}}</td><td>¥{{fmt(o.commission)}}</td><td>¥{{fmt(o.sellerIncome)}}</td>
+                                <td><span class="admin-badge" :class="o.status==='已完成'?'badge-on':(o.status==='已取消'?'badge-off':'badge-admin')">{{o.status}}</span></td>
+                                <td>{{o.receiverName}}</td><td>{{shortTime(o.createdAt)}}</td>
+                            </tr>
+                            <tr v-if="!orders.length"><td colspan="10" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无订单</div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="admin-pager">
+                    <button :disabled="orderPage<=1" @click="loadOrders(orderPage-1)">上一页</button>
+                    <span>{{orderPage}} / {{orderTotalPages||1}}</span>
+                    <button :disabled="orderPage>=orderTotalPages" @click="loadOrders(orderPage+1)">下一页</button>
+                </div>
+            </div>
+
+            <!-- 收入统计 -->
+            <div v-if="tab==='revenue'">
+                <div class="revenue-chart">
+                    <div class="chart-title">每日佣金收入</div>
+                    <div class="chart-bars" v-if="revenue.length">
+                        <div class="chart-bar" v-for="r in revenue" :key="r.date">
+                            <div class="bar-val">¥{{fmt(r.commission)}}</div>
+                            <div class="bar-fill" :style="{height: barHeight(r.commission)}"></div>
+                            <div class="bar-date">{{r.date}}</div>
+                        </div>
+                    </div>
+                    <div class="empty-state" v-else><div class="icon"><i class="fa fa-bar-chart"></i></div><div class="text">暂无收入数据</div></div>
+                </div>
+            </div>
+
+            <!-- 分类管理 -->
+            <div v-if="tab==='categories'">
+                <div class="admin-actions-bar" style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+                    <button class="btn btn-primary" @click="openCatForm()"><i class="fa fa-plus"></i> 添加分类</button>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>ID</th><th>名称</th><th>图标</th><th>排序</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr v-for="c in categories" :key="c.id">
+                                <td>{{c.id}}</td>
+                                <td>{{c.name}}</td>
+                                <td>{{c.icon || '-'}}</td>
+                                <td>{{c.sort}}</td>
+                                <td class="admin-actions">
+                                    <button class="btn btn-sm btn-primary" @click="openCatForm(c)">编辑</button>
+                                    <button class="btn btn-sm btn-danger" @click="deleteCategory(c.id)">删除</button>
+                                </td>
+                            </tr>
+                            <tr v-if="!categories.length"><td colspan="5" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无分类</div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 分类编辑弹窗 -->
+                <div class="modal-overlay" v-if="showCatForm" @click.self="showCatForm=false">
+                    <div class="modal-box" style="max-width:360px;">
+                        <h3>{{catEditMode==='create' ? '新增分类' : '编辑分类'}}</h3>
+                        <div class="form-group" style="margin-top:14px;"><label>名称</label><input v-model="catForm.name" placeholder="分类名称"></div>
+                        <div class="form-group"><label>图标路径</label><input v-model="catForm.icon" placeholder="/icons/category.png"></div>
+                        <div class="form-group"><label>排序</label><input v-model="catForm.sort" type="number" placeholder="0"></div>
+                        <div class="modal-actions" style="margin-top:16px;">
+                            <button class="btn btn-ghost" @click="showCatForm=false">取消</button>
+                            <button class="btn btn-primary" :class="{'btn-disabled':catSubmitting}" @click="submitCategory">{{catSubmitting ? '提交中...' : '保存'}}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="lib/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, reactive, computed, onMounted } = Vue;
+const store = reactive({ user: JSON.parse(localStorage.getItem('user') || 'null') });
+createApp({
+    setup() {
+        const tab = ref('dashboard');
+        const stats = reactive({ userCount: 0, itemCount: 0, orderCount: 0, totalCommission: 0, todayCommission: 0, todayOrders: 0 });
+        const users = ref([]), items = ref([]), orders = ref([]), revenue = ref([]);
+        const userPage = ref(1), itemPage = ref(1), orderPage = ref(1);
+        const userTotalPages = ref(1), itemTotalPages = ref(1), orderTotalPages = ref(1);
+        const userKw = ref(''), itemKw = ref(''), itemStatus = ref('');
+        const orderKw = ref(''), orderStatus = ref('');
+        const showBalanceForm = ref(false);
+        const balanceUser = ref(null);
+        const balanceValue = ref('');
+        const balanceSubmitting = ref(false);
+        const categories = ref([]);
+        const showCatForm = ref(false);
+        const catEditMode = ref('create');
+        const catSubmitting = ref(false);
+        const catForm = reactive({ name: '', icon: '', sort: 0 });
+
+        const tabTitle = computed(() => ({ dashboard: '数据概览', users: '用户管理', items: '商品管理', orders: '订单监控', revenue: '收入统计', categories: '分类管理' }[tab.value]));
+
+        async function loadStats() {
+            try { const res = await adminApi.getStats(); Object.assign(stats, res.data); } catch (e) { showToast(e.message); }
+        }
+        async function loadUsers(page) {
+            userPage.value = page;
+            try {
+                const res = await adminApi.getUsers({ page, size: 10, keyword: userKw.value });
+                const pr = res.data || {};
+                users.value = pr.data || [];
+                userTotalPages.value = Math.ceil((pr.total || 0) / (pr.size || 10)) || 1;
+            } catch (e) { showToast(e.message); }
+        }
+        async function loadItems(page) {
+            itemPage.value = page;
+            try {
+                const res = await adminApi.getItems({ page, size: 10, keyword: itemKw.value, status: itemStatus.value });
+                const pr = res.data || {};
+                items.value = pr.data || [];
+                itemTotalPages.value = Math.ceil((pr.total || 0) / (pr.size || 10)) || 1;
+            } catch (e) { showToast(e.message); }
+        }
+        async function loadOrders(page) {
+            orderPage.value = page;
+            try {
+                const res = await adminApi.getOrders({ page, size: 10, status: orderStatus.value, keyword: orderKw.value });
+                const pr = res.data || {};
+                orders.value = pr.data || [];
+                orderTotalPages.value = Math.ceil((pr.total || 0) / (pr.size || 10)) || 1;
+            } catch (e) { showToast(e.message); }
+        }
+        async function loadRevenue() {
+            try { const res = await adminApi.getRevenue(); revenue.value = res.data || []; } catch (e) { showToast(e.message); }
+        }
+        async function loadCategories() {
+            try { const res = await categoryApi.getList(); categories.value = res.data || []; } catch (e) { showToast(e.message); }
+        }
+        function openCatForm(c) {
+            if (c) {
+                catEditMode.value = 'edit';
+                catForm.name = c.name;
+                catForm.icon = c.icon || '';
+                catForm.sort = c.sort;
+                catForm.id = c.id;
+            } else {
+                catEditMode.value = 'create';
+                catForm.name = ''; catForm.icon = ''; catForm.sort = 0;
+                catForm.id = null;
+            }
+            showCatForm.value = true;
+        }
+        async function submitCategory() {
+            if (!catForm.name.trim()) return showToast('请输入分类名称');
+            catSubmitting.value = true;
+            try {
+                if (catEditMode.value === 'create') {
+                    await adminApi.createCategory({ name: catForm.name, icon: catForm.icon, sort: parseInt(catForm.sort || 0) });
+                    showToast('分类已创建');
+                } else {
+                    await adminApi.updateCategory(catForm.id, { name: catForm.name, icon: catForm.icon, sort: parseInt(catForm.sort || 0) });
+                    showToast('分类已更新');
+                }
+                showCatForm.value = false;
+                loadCategories();
+            } catch (e) { showToast(e.message); }
+            catSubmitting.value = false;
+        }
+        async function deleteCategory(id) {
+            if (!await showModal('确认删除', '删除后将影响该分类下的商品显示，确定吗？')) return;
+            try { await adminApi.deleteCategory(id); showToast('已删除'); loadCategories(); }
+            catch (e) { showToast(e.message); }
+        }
+        async function setUserStatus(id, status) {
+            try { await adminApi.updateUserStatus(id, { status }); showToast(status ? '已启用' : '已禁用'); loadUsers(userPage.value); }
+            catch (e) { showToast(e.message); }
+        }
+        function openBalance(u) {
+            balanceUser.value = u;
+            balanceValue.value = (u.balance || 0);
+            showBalanceForm.value = true;
+            balanceSubmitting.value = false;
+        }
+        async function submitBalance() {
+            const val = parseFloat(balanceValue.value);
+            if (isNaN(val) || val < 0) return showToast('请输入有效的余额');
+            balanceSubmitting.value = true;
+            try {
+                await adminApi.setUserBalance(balanceUser.value.id, { balance: val });
+                showToast('余额已更新');
+                showBalanceForm.value = false;
+                loadUsers(userPage.value);
+            } catch (e) { showToast(e.message); }
+            balanceSubmitting.value = false;
+        }
+        async function deleteUser(id) {
+            if (!await showModal('确认删除', '删除后不可恢复，确定吗？')) return;
+            try { await adminApi.deleteUser(id); showToast('已删除'); loadUsers(userPage.value); }
+            catch (e) { showToast(e.message); }
+        }
+        async function offline(id) {
+            if (!await showModal('确认下架', '确定下架该商品吗？')) return;
+            try { await adminApi.offlineItem(id); showToast('已下架'); loadItems(itemPage.value); }
+            catch (e) { showToast(e.message); }
+        }
+        async function relist(id) {
+            try { await adminApi.relistItem(id); showToast('已重新上架'); loadItems(itemPage.value); }
+            catch (e) { showToast(e.message); }
+        }
+        function barHeight(v) {
+            const max = Math.max(...revenue.value.map(r => parseFloat(r.commission || 0)), 1);
+            return Math.max(20, parseFloat(v || 0) / max * 180) + 'px';
+        }
+        function backHome() { location.href = 'index.html'; }
+        function logout() { localStorage.clear(); location.href = 'login.html'; }
+        function fmt(n) { return parseFloat(n || 0).toFixed(2); }
+        function shortTime(t) { return t ? new Date(t).toLocaleString() : '-'; }
+        function imgUrl(u) { return getImageUrl(u); }
+
+        onMounted(() => {
+            if (!isLoggedIn() || (store.user && store.user.role !== 'ADMIN')) {
+                showToast('请先以管理员身份登录');
+                location.href = 'login.html?back=admin.html';
+                return;
+            }
+            loadStats(); loadUsers(1); loadItems(1); loadOrders(1); loadRevenue(); loadCategories();
+        });
+
+        return { store, tab, tabTitle, stats, users, items, orders, revenue,
+                 userPage, itemPage, orderPage, userTotalPages, itemTotalPages, orderTotalPages,
+                 userKw, itemKw, itemStatus, orderKw, orderStatus, loadUsers, loadItems, loadOrders,
+                 setUserStatus, deleteUser, offline, relist,
+                 showBalanceForm, balanceUser, balanceValue, balanceSubmitting, openBalance, submitBalance,
+                 barHeight, backHome, logout, fmt, shortTime, imgUrl,
+                 categories, showCatForm, catEditMode, catSubmitting, catForm,
+                 loadCategories, openCatForm, submitCategory, deleteCategory };
+    }
+}).mount('#adminApp');
+</script>
+</body>
+</html>

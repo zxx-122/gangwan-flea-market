@@ -1,0 +1,12 @@
+# ================================================
+# Profile: mysql  -- 使用本地 MySQL 5.7/8.0 数据库
+# 启动方式: mvnw spring-boot:run -Dspring-boot.run.profiles=mysql
+# ================================================
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/gwtzsc?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: "123456"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      connectionInitSql: "SET NAMES utf8mb4"

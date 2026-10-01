@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+jwt:
+  secret: "harbor-flea-market-secret-key-2024-this-is-a-very-long-and-secure-key-for-jwt"
+  expiration: 86400000
+
+upload:
+  path: "D:/港湾跳蚤市场/uploads"
