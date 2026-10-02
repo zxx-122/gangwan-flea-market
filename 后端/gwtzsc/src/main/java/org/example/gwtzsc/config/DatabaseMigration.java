@@ -102,7 +102,8 @@ public class DatabaseMigration implements CommandLineRunner {
         List<String[]> additions = Arrays.asList(
                 new String[]{"tags", "TEXT"},
                 new String[]{"is_original", "TINYINT DEFAULT 0"},
-                new String[]{"is_free_ship", "TINYINT DEFAULT 0"}
+                new String[]{"is_free_ship", "TINYINT DEFAULT 0"},
+                new String[]{"stock", "INTEGER DEFAULT 1"}
         );
         for (String[] add : additions) {
             String name = add[0];

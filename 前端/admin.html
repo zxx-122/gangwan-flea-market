@@ -75,13 +75,21 @@
                         <div><div class="stat-num">{{stats.todayOrders}}</div><div class="stat-label">今日订单</div></div>
                         <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
                     </div>
+                    <div class="stat-card" style="--c:#E67E22;--c-bg:#fdf0e7;cursor:pointer;" @click="tab='orders'; orderStatus='待发货'; loadOrders(1)">
+                        <div><div class="stat-num">{{stats.pendingShipCount||0}}</div><div class="stat-label">待发货订单</div></div>
+                        <div class="stat-icon"><i class="fa fa-truck"></i></div>
+                    </div>
+                    <div class="stat-card" style="--c:#16A085;--c-bg:#e8f8f5;cursor:pointer;" @click="tab='orders'; orderStatus='待收货'; loadOrders(1)">
+                        <div><div class="stat-num">{{stats.pendingReceiveCount||0}}</div><div class="stat-label">待收货订单</div></div>
+                        <div class="stat-icon"><i class="fa fa-map-marker"></i></div>
+                    </div>
                 </div>
             </div>
 
             <!-- 用户管理 -->
             <div v-if="tab==='users'">
                 <div class="admin-search">
-                    <input v-model="userKw" placeholder="搜索用户名/昵称" @keyup.enter="loadUsers(1)">
+                    <input v-model="userKw" placeholder="搜索用户名/昵称/手机号" @keyup.enter="loadUsers(1)">
                     <button class="btn btn-primary" @click="loadUsers(1)"><i class="fa fa-search"></i></button>
                 </div>
                 <div class="admin-table-wrap">
@@ -135,7 +143,7 @@
                 </div>
                 <div class="admin-table-wrap">
                     <table class="admin-table">
-                        <thead><tr><th>ID</th><th>商品</th><th>卖家</th><th>价格</th><th>成色</th><th>状态</th><th>浏览</th><th>发布时间</th><th>操作</th></tr></thead>
+                        <thead><tr><th>ID</th><th>商品</th><th>卖家</th><th>价格</th><th>库存</th><th>成色</th><th>状态</th><th>浏览</th><th>发布时间</th><th>操作</th></tr></thead>
                         <tbody>
                             <tr v-for="it in items" :key="it.id">
                                 <td>{{it.id}}</td>
@@ -145,7 +153,9 @@
                                         {{it.title}}
                                     </div>
                                 </td>
-                                <td>{{it.sellerName}}</td><td>¥{{fmt(it.price)}}</td><td>{{it.condition||'-'}}</td>
+                                <td>{{it.sellerName}}</td><td>¥{{fmt(it.price)}}</td>
+                                <td><span :style="{color: it.stock<=3 ? '#E74C3C' : 'inherit'}">{{it.stock==null?1:it.stock}}</span></td>
+                                <td>{{it.condition||'-'}}</td>
                                 <td><span class="admin-badge" :class="it.status==='在售'?'badge-on':(it.status==='已售'?'badge-admin':'badge-off')">{{it.status}}</span></td>
                                 <td>{{it.views}}</td><td>{{shortTime(it.createdAt)}}</td>
                                 <td class="admin-actions">
@@ -153,7 +163,7 @@
                                     <button class="btn btn-sm btn-primary" v-if="it.status==='下架'" @click="relist(it.id)">重新上架</button>
                                 </td>
                             </tr>
-                            <tr v-if="!items.length"><td colspan="9" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无商品</div></td></tr>
+                            <tr v-if="!items.length"><td colspan="10" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无商品</div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -175,15 +185,16 @@
                 </div>
                 <div class="admin-table-wrap">
                     <table class="admin-table">
-                        <thead><tr><th>订单号</th><th>商品</th><th>卖家</th><th>买家</th><th>价格</th><th>佣金</th><th>卖家收入</th><th>状态</th><th>收货人</th><th>下单时间</th></tr></thead>
+                        <thead><tr><th>订单号</th><th>商品</th><th>卖家</th><th>买家</th><th>价格</th><th>佣金</th><th>卖家收入</th><th>状态</th><th>物流</th><th>收货人</th><th>下单时间</th></tr></thead>
                         <tbody>
                             <tr v-for="o in orders" :key="o.id">
                                 <td>{{o.orderNo}}</td><td class="td-title">{{o.itemTitle}}</td><td>{{o.sellerName}}</td><td>{{o.buyerName}}</td>
                                 <td>¥{{fmt(o.price)}}</td><td>¥{{fmt(o.commission)}}</td><td>¥{{fmt(o.sellerIncome)}}</td>
                                 <td><span class="admin-badge" :class="o.status==='已完成'?'badge-on':(o.status==='已取消'?'badge-off':'badge-admin')">{{o.status}}</span></td>
+                                <td>{{o.courierCompany ? o.courierCompany + ' ' + (o.trackingNo||'') : '-'}}</td>
                                 <td>{{o.receiverName}}</td><td>{{shortTime(o.createdAt)}}</td>
                             </tr>
-                            <tr v-if="!orders.length"><td colspan="10" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无订单</div></td></tr>
+                            <tr v-if="!orders.length"><td colspan="11" class="empty-state"><div class="icon"><i class="fa fa-inbox"></i></div><div class="text">暂无订单</div></td></tr>
                         </tbody>
                     </table>
                 </div>

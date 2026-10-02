@@ -32,6 +32,9 @@ public class ItemRequest {
     /** 是否包邮：1 是，0 否 */
     private Integer isFreeShip;
 
+    /** 库存数量，不传默认 1，售罄自动下架 */
+    private Integer stock;
+
     @Size(max = 9, message = "商品图片最多9张")
     private List<String> images;
 }

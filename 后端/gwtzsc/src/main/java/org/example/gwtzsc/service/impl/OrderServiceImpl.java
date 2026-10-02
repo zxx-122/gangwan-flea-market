@@ -60,6 +60,8 @@ public class OrderServiceImpl implements OrderService {
         Item item = itemMapper.selectById(req.getItemId());
         if (item == null) throw new RuntimeException("商品不存在");
         if (!"在售".equals(item.getStatus())) throw new RuntimeException("商品已下架或已售出");
+        int stock = item.getStock() == null ? 1 : item.getStock();
+        if (stock <= 0) throw new RuntimeException("商品库存不足");
         if (item.getUserId().equals(buyerId)) throw new RuntimeException("不能购买自己的商品");
 
         BigDecimal price = item.getPrice();
@@ -80,7 +82,10 @@ public class OrderServiceImpl implements OrderService {
         order.setReceiverAddress(req.getReceiverAddress());
         orderMapper.insert(order);
 
-        item.setStatus("已售");
+        // 扣减库存，售罄自动置为已售
+        int remain = stock - 1;
+        item.setStock(remain);
+        if (remain <= 0) item.setStatus("已售");
         itemMapper.updateById(item);
 
         clearHomeItemCache();
@@ -168,7 +173,10 @@ public class OrderServiceImpl implements OrderService {
 
         Item item = itemMapper.selectById(order.getItemId());
         if (item != null) {
-            item.setStatus("在售");
+            // 取消订单回补库存；若因售罄自动置为已售则恢复在售
+            int stock = item.getStock() == null ? 1 : item.getStock();
+            item.setStock(stock + 1);
+            if ("已售".equals(item.getStatus())) item.setStatus("在售");
             itemMapper.updateById(item);
             redisTemplate.delete("item:" + item.getId());
         }

@@ -59,6 +59,12 @@ public class AdminServiceImpl implements AdminService {
             new LambdaQueryWrapper<Order>().ge(Order::getCreatedAt, todayStart));
         stats.setTodayOrders(todayOrders);
 
+        // 管理员待办：待发货 / 待收货
+        stats.setPendingShipCount(orderMapper.selectCount(
+            new LambdaQueryWrapper<Order>().eq(Order::getStatus, "待发货")));
+        stats.setPendingReceiveCount(orderMapper.selectCount(
+            new LambdaQueryWrapper<Order>().eq(Order::getStatus, "待收货")));
+
         return stats;
     }
 
@@ -67,7 +73,10 @@ public class AdminServiceImpl implements AdminService {
         Page<User> userPage = new Page<>(page, size);
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         if (StrUtil.isNotBlank(keyword)) {
-            wrapper.like(User::getUsername, keyword).or().like(User::getNickname, keyword);
+            // 支持按用户名 / 昵称 / 手机号搜索
+            wrapper.and(w -> w.like(User::getUsername, keyword)
+                    .or().like(User::getNickname, keyword)
+                    .or().like(User::getPhone, keyword));
         }
         wrapper.orderByDesc(User::getCreatedAt);
         userMapper.selectPage(userPage, wrapper);
@@ -140,6 +149,7 @@ public class AdminServiceImpl implements AdminService {
             m.put("status", item.getStatus());
             m.put("condition", item.getCondition());
             m.put("views", item.getViews());
+            m.put("stock", item.getStock() == null ? 1 : item.getStock());
             m.put("createdAt", item.getCreatedAt());
             List<String> images = imagesByItem.getOrDefault(item.getId(), Collections.emptyList());
             m.put("mainImage", images.isEmpty() ? null : images.get(0));

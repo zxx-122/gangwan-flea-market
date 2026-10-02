@@ -19,6 +19,8 @@ public class Item {
     private String condition;
     private String status;
     private Integer views;
+    /** 库存数量，默认1；每次售出减1，售罄自动变已售 */
+    private Integer stock;
     /** 卖点标签，逗号分隔，如：全新,包邮 */
     private String tags;
     /** 是否实物拍摄：1 是，0 否 */

@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS `item` (
     `condition` VARCHAR(20) DEFAULT NULL COMMENT '全新/几乎全新/轻微使用痕迹/明显使用痕迹',
     `status` VARCHAR(10) NOT NULL DEFAULT '在售' COMMENT '在售/已售/下架',
     `views` INT NOT NULL DEFAULT 0,
+    `stock` INT NOT NULL DEFAULT 1 COMMENT '库存数量，售罄自动已售',
     `tags` VARCHAR(255) DEFAULT NULL COMMENT '卖点标签，逗号分隔',
     `is_original` TINYINT NOT NULL DEFAULT 0 COMMENT '是否实物拍摄 1是/0否',
     `is_free_ship` TINYINT NOT NULL DEFAULT 0 COMMENT '是否包邮 1是/0否',

@@ -144,6 +144,7 @@ public class ItemServiceImpl implements ItemService {
         result.put("isFreeShip", item.getIsFreeShip());
         result.put("status", item.getStatus());
         result.put("views", item.getViews());
+        result.put("stock", item.getStock() == null ? 1 : item.getStock());
         result.put("createdAt", item.getCreatedAt());
         result.put("updatedAt", item.getUpdatedAt());
 
@@ -201,6 +202,10 @@ public class ItemServiceImpl implements ItemService {
         item.setTags(req.getTags());
         item.setIsOriginal(req.getIsOriginal() == null ? 1 : req.getIsOriginal());
         item.setIsFreeShip(req.getIsFreeShip() == null ? 0 : req.getIsFreeShip());
+        int stock = req.getStock() == null ? 1 : req.getStock();
+        if (stock < 1) throw new RuntimeException("库存至少为1");
+        if (stock > 9999) throw new RuntimeException("库存最大9999");
+        item.setStock(stock);
         item.setStatus("在售");
         item.setViews(0);
         itemMapper.insert(item);
@@ -233,6 +238,12 @@ public class ItemServiceImpl implements ItemService {
         if (req.getTags() != null) item.setTags(req.getTags());
         if (req.getIsOriginal() != null) item.setIsOriginal(req.getIsOriginal());
         if (req.getIsFreeShip() != null) item.setIsFreeShip(req.getIsFreeShip());
+        if (req.getStock() != null) {
+            if (req.getStock() < 1) throw new RuntimeException("库存至少为1");
+            if (req.getStock() > 9999) throw new RuntimeException("库存最大9999");
+            // 已售商品库存只能由订单取消回补，不允许直接编辑
+            if (!"已售".equals(item.getStatus())) item.setStock(req.getStock());
+        }
         itemMapper.updateById(item);
 
         if (req.getImages() != null) {
@@ -395,6 +406,7 @@ public class ItemServiceImpl implements ItemService {
             map.put("isFreeShip", item.getIsFreeShip());
             map.put("status", item.getStatus());
             map.put("views", item.getViews());
+            map.put("stock", item.getStock() == null ? 1 : item.getStock());
             map.put("createdAt", item.getCreatedAt() != null ? item.getCreatedAt().toString() : null);
             map.put("updatedAt", item.getUpdatedAt() != null ? item.getUpdatedAt().toString() : null);
             List<String> images = imagesByItem.getOrDefault(item.getId(), Collections.emptyList());
