@@ -16,6 +16,9 @@ public class JwtInterceptor implements HandlerInterceptor {
     private static final Pattern ITEM_RELATED = Pattern.compile("^/api/item/\\d+/related$");
     /** 商品详情：游客可浏览（下单/收藏/聊天等操作仍需登录） */
     private static final Pattern ITEM_DETAIL = Pattern.compile("^/api/item/\\d+$");
+    /** 商品/用户评价、公告列表：游客可看 */
+    private static final Pattern PUBLIC_GET = Pattern.compile(
+            "^/api/review/item/\\d+$|^/api/review/user/\\d+$|^/api/review/user/\\d+/summary$|^/api/announcement/list$");
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -57,6 +60,11 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
         Long userId = jwtUtil.getUserIdFromToken(token);
         request.setAttribute("userId", userId);
+        // 角色透传给需要权限判断的接口（如公告管理）
+        try {
+            request.setAttribute("role", jwtUtil.parseToken(token).get("role"));
+        } catch (Exception ignored) {
+        }
         return true;
     }
 
@@ -73,7 +81,8 @@ public class JwtInterceptor implements HandlerInterceptor {
         if ("/api/item/list".equals(uri) || "/api/item/search".equals(uri)
                 || "/api/item/price-ref".equals(uri)
                 || ITEM_RELATED.matcher(uri).matches()
-                || ITEM_DETAIL.matcher(uri).matches()) {
+                || ITEM_DETAIL.matcher(uri).matches()
+                || PUBLIC_GET.matcher(uri).matches()) {
             return true;
         }
         return uri.startsWith("/api/item/category/");

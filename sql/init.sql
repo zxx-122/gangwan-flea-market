@@ -139,3 +139,26 @@ CREATE TABLE IF NOT EXISTS `fund_flow` (
     INDEX `idx_user_id` (`user_id`),
     INDEX `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 订单评价表（一单一评）
+CREATE TABLE IF NOT EXISTS `review` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `order_id` BIGINT NOT NULL UNIQUE,
+    `item_id` BIGINT NOT NULL,
+    `from_user_id` BIGINT NOT NULL,
+    `to_user_id` BIGINT NOT NULL,
+    `rating` INT NOT NULL DEFAULT 5 COMMENT '1-5星',
+    `content` TEXT DEFAULT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_item_id` (`item_id`),
+    INDEX `idx_to_user` (`to_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 公告表
+CREATE TABLE IF NOT EXISTS `announcement` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `title` VARCHAR(100) NOT NULL,
+    `content` TEXT DEFAULT NULL,
+    `enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '1启用/0停用',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

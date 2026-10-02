@@ -59,6 +59,30 @@ public class UserController {
         return Result.success(userService.withdraw(userId, req));
     }
 
+    /** 余额充值（演示环境模拟到账，不接真实支付） */
+    @PostMapping("/recharge")
+    public Result<?> recharge(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+        Long userId = (Long) request.getAttribute("userId");
+        java.math.BigDecimal amount;
+        try {
+            amount = new java.math.BigDecimal(String.valueOf(body.get("amount")));
+        } catch (Exception e) {
+            return Result.error("金额格式不正确");
+        }
+        if (amount.compareTo(java.math.BigDecimal.ZERO) <= 0) return Result.error("充值金额必须大于0");
+        if (amount.compareTo(new java.math.BigDecimal("99999")) > 0) return Result.error("单笔充值不能超过99999");
+
+        org.example.gwtzsc.entity.User user = userService.getById(userId);
+        if (user == null) return Result.error("用户不存在");
+        if (user.getStatus() != null && user.getStatus() == 0) return Result.error("账号已被禁用");
+
+        user.setBalance(user.getBalance().add(amount));
+        userService.addBalance(user, amount, "余额充值");
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("balance", user.getBalance());
+        return Result.success(result);
+    }
+
     @GetMapping("/fund-flows")
     public Result<?> fundFlows(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");

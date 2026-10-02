@@ -34,6 +34,8 @@ public class DatabaseMigration implements CommandLineRunner {
         migrateOrderColumns(sqlite);
         migrateItemColumns(sqlite);
         migrateFundFlowTable(sqlite);
+        migrateReviewTable(sqlite);
+        migrateAnnouncementTable(sqlite);
         log.info("[DatabaseMigration] 数据库结构校验完成（sqlite={}）", sqlite);
     }
 
@@ -115,6 +117,68 @@ public class DatabaseMigration implements CommandLineRunner {
             } catch (Exception e) {
                 log.warn("[DatabaseMigration] 新增字段 {} 失败：{}", name, e.getMessage());
             }
+        }
+    }
+
+    /** 订单评价表（一单一评，幂等创建） */
+    private void migrateReviewTable(boolean sqlite) {
+        String ddl;
+        if (sqlite) {
+            ddl = "CREATE TABLE IF NOT EXISTS review ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "order_id INTEGER NOT NULL UNIQUE, "
+                    + "item_id INTEGER NOT NULL, "
+                    + "from_user_id INTEGER NOT NULL, "
+                    + "to_user_id INTEGER NOT NULL, "
+                    + "rating INTEGER NOT NULL DEFAULT 5, "
+                    + "content TEXT DEFAULT NULL, "
+                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)";
+        } else {
+            ddl = "CREATE TABLE IF NOT EXISTS review ("
+                    + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                    + "order_id BIGINT NOT NULL UNIQUE, "
+                    + "item_id BIGINT NOT NULL, "
+                    + "from_user_id BIGINT NOT NULL, "
+                    + "to_user_id BIGINT NOT NULL, "
+                    + "rating INT NOT NULL DEFAULT 5, "
+                    + "content TEXT, "
+                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "INDEX idx_item_id (item_id), "
+                    + "INDEX idx_to_user (to_user_id)"
+                    + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        }
+        try {
+            jdbcTemplate.execute(ddl);
+            log.info("[DatabaseMigration] review 表结构校验完成");
+        } catch (Exception e) {
+            log.warn("[DatabaseMigration] 创建 review 表失败：{}", e.getMessage());
+        }
+    }
+
+    /** 公告表（幂等创建） */
+    private void migrateAnnouncementTable(boolean sqlite) {
+        String ddl;
+        if (sqlite) {
+            ddl = "CREATE TABLE IF NOT EXISTS announcement ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "title TEXT NOT NULL, "
+                    + "content TEXT DEFAULT NULL, "
+                    + "enabled INTEGER NOT NULL DEFAULT 1, "
+                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)";
+        } else {
+            ddl = "CREATE TABLE IF NOT EXISTS announcement ("
+                    + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                    + "title VARCHAR(100) NOT NULL, "
+                    + "content TEXT, "
+                    + "enabled TINYINT NOT NULL DEFAULT 1, "
+                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        }
+        try {
+            jdbcTemplate.execute(ddl);
+            log.info("[DatabaseMigration] announcement 表结构校验完成");
+        } catch (Exception e) {
+            log.warn("[DatabaseMigration] 创建 announcement 表失败：{}", e.getMessage());
         }
     }
 

@@ -66,7 +66,25 @@ const userApi = {
         });
     },
     withdraw(data) { return api.post('/user/withdraw', data); },
+    recharge(data) { return api.post('/user/recharge', data); },
     getFundFlows() { return api.get('/user/fund-flows'); }
+};
+
+// ===================== 评价接口 =====================
+const reviewApi = {
+    create(data) { return api.post('/review', data); },
+    byOrder(orderId) { return api.get('/review/order/' + orderId); },
+    byItem(itemId) { return api.get('/review/item/' + itemId); },
+    byUser(userId) { return api.get('/review/user/' + userId); },
+    userSummary(userId) { return api.get('/review/user/' + userId + '/summary'); }
+};
+
+// ===================== 公告接口 =====================
+const announcementApi = {
+    list(admin) { return api.get('/announcement/list', { params: admin ? { admin: 'true' } : {} }); },
+    create(data) { return api.post('/announcement', data); },
+    update(id, data) { return api.put('/announcement/' + id, data); },
+    remove(id) { return api.delete('/announcement/' + id); }
 };
 
 // ===================== 商品接口 =====================

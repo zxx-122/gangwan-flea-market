@@ -73,6 +73,13 @@ const store = reactive({
             const res = await messageApi.getSessions();
             this.totalUnread = (res.data || []).reduce((s, x) => s + (x.unread || 0), 0);
         } catch (e) { /* ignore */ }
+    },
+    announcement: null,
+    async loadAnnouncement() {
+        try {
+            const res = await announcementApi.list();
+            this.announcement = (res.data && res.data[0]) || null;
+        } catch (e) { /* ignore */ }
     }
 });
 window.store = store;
@@ -105,6 +112,28 @@ const Home = {
             </div>
         </div>
 
+        <!-- 平台公告横幅 -->
+        <div class="notice-bar" v-if="store.announcement && !noticeClosed" @click="noticeOpen=true">
+            <i class="fa fa-bullhorn notice-icon"></i>
+            <span class="notice-text">{{store.announcement.title}}</span>
+            <i class="fa fa-angle-right" style="margin-left:auto;"></i>
+            <i class="fa fa-times notice-close" @click.stop="closeNotice"></i>
+        </div>
+        <!-- 公告详情 -->
+        <div class="modal-overlay" v-if="noticeOpen" @click.self="noticeOpen=false">
+            <div class="modal-box" style="max-width:360px;">
+                <div class="ship-head">
+                    <div class="ship-icon" style="background:linear-gradient(135deg,#FF9A44,#FF6B35);"><i class="fa fa-bullhorn"></i></div>
+                    <h3>平台公告</h3>
+                </div>
+                <div style="text-align:left;font-size:14px;line-height:1.9;color:#444;max-height:50vh;overflow:auto;">
+                    <div style="font-weight:600;margin-bottom:8px;">{{store.announcement.title}}</div>
+                    <div style="white-space:pre-wrap;">{{store.announcement.content || '暂无详细内容'}}</div>
+                    <div style="font-size:11px;color:#bbb;margin-top:10px;">{{shortTime(store.announcement.createdAt)}}</div>
+                </div>
+                <button class="btn btn-primary" style="margin-top:14px;width:100%;" @click="noticeOpen=false; closeNotice()">我知道了</button>
+            </div>
+        </div>
         <div class="category-nav">
             <div class="category-item" v-for="c in store.categories" :key="c.id" @click="filterCategory(c.id)">
                 <div class="category-icon"><img v-if="c.icon" :src="imgUrl(c.icon)" style="width:24px;height:24px;"><i v-else class="fa fa-tag"></i></div>
@@ -161,16 +190,24 @@ const Home = {
                 </div>
             </div>
             <div class="search-results">
-                    <div class="waterfall" v-if="searchResults.length">
+                <div class="sort-toolbar" style="padding:10px 14px 0;" v-if="searched && searchResults.length">
+                    <div class="sort-chip" :class="{active: activeSort==='new'}" @click="setSort('new')">最新</div>
+                    <div class="sort-chip" :class="{active: activeSort==='hot'}" @click="setSort('hot')">最热</div>
+                    <div class="sort-chip" :class="{active: activeSort==='price_asc'}" @click="setSort('price_asc')">价格↑</div>
+                    <div class="sort-chip" :class="{active: activeSort==='price_desc'}" @click="setSort('price_desc')">价格↓</div>
+                </div>
+                <div class="load-more" v-if="searchLoading"><span class="scroll-spinner"></span> 加载中...</div>
+                <div class="waterfall" v-if="searchResults.length">
                         <div class="item-card liquid-card" v-for="it in searchResults" :key="it.id" @click="searchOpen=false; toDetail(it.id)">
-                        <img class="item-img" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                        <img class="item-img" loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
                         <div class="item-info">
                             <div class="item-title">{{it.title}}</div>
                             <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
                         </div>
                     </div>
                 </div>
-                <div class="empty-state" v-if="searched && !searchResults.length">
+                <div class="load-more" v-if="searched && searchResults.length && !searchNoMore && !searchLoading">上拉加载更多</div>
+                <div class="empty-state" v-if="searched && !searchLoading && !searchResults.length">
                     <div class="icon"><i class="fa fa-search"></i></div>
                     <div class="text">没有找到相关商品</div>
                     <div class="sub" style="margin-top:14px;text-align:left;padding:0 20px;">
@@ -227,16 +264,40 @@ const Home = {
         function setSort(s) {
             if (activeSort.value === s) return;
             activeSort.value = s;
+            if (searchOpen.value && searched.value) { doSearch(true); return; }
             load(true);
         }
 
-        async function doSearch() {
+        // 搜索：分页 + 排序
+        const searchPage = ref(1);
+        const searchTotal = ref(0);
+        const searchLoading = ref(false);
+        const searchNoMore = computed(() => searchResults.value.length >= searchTotal.value);
+
+        async function doSearch(reset) {
+            if (reset === undefined) reset = true;
             if (!keyword.value.trim()) { searched.value = false; searchResults.value = []; return; }
+            if (searchLoading.value) return;
+            if (reset) { searchPage.value = 1; searchResults.value = []; }
+            searchLoading.value = true;
             try {
-                const res = await itemApi.search({ keyword: keyword.value, page: 1, size: 50 });
-                searchResults.value = (res.data && res.data.data) || [];
+                const res = await itemApi.search({ keyword: keyword.value, page: searchPage.value, size: 10, sort: activeSort.value });
+                const pr = res.data || {};
+                const list = pr.data || [];
+                searchResults.value = reset ? list : searchResults.value.concat(list);
+                searchTotal.value = pr.total || 0;
+                searched.value = true;
             } catch (e) { showToast(e.message); }
-            searched.value = true;
+            searchLoading.value = false;
+        }
+
+        function searchScroll() {
+            if (!searchOpen.value || searchLoading.value || searchNoMore.value || !searched.value) return;
+            const box = document.querySelector('.search-results');
+            if (!box) return;
+            const st = document.documentElement.scrollTop || document.body.scrollTop;
+            const sh = document.documentElement.scrollHeight;
+            if (sh - st - window.innerHeight < 120) { searchPage.value++; doSearch(false); }
         }
 
         function toDetail(id) { router.push('/item/' + id); }
@@ -273,7 +334,7 @@ const Home = {
         }
 
         function onScroll() {
-            if (searchOpen.value) return;
+            if (searchOpen.value) { searchScroll(); return; }
             const st = document.documentElement.scrollTop || document.body.scrollTop;
             const sh = document.documentElement.scrollHeight;
             if (sh - st - window.innerHeight < 100 && !noMore.value && !loading.value) {
@@ -293,9 +354,22 @@ const Home = {
             if (v) { searched.value = false; nextTick(() => searchInput.value && searchInput.value.focus()); }
         });
 
+        // 平台公告横幅
+        const noticeOpen = ref(false);
+        const noticeReadId = ref(localStorage.getItem('noticeRead'));
+        const noticeClosed = computed(() => !store.announcement || noticeReadId.value === String(store.announcement.id));
+        function closeNotice() {
+            if (store.announcement) {
+                noticeReadId.value = String(store.announcement.id);
+                localStorage.setItem('noticeRead', noticeReadId.value);
+            }
+        }
+
         return {
             store, items, loading, noMore, activeCat, activeSort, setSort,
             searchOpen, keyword, searchResults, searched, searchInput, hotWords, suggestWords,
+            searchLoading, searchNoMore, searchScroll, doSearch,
+            noticeOpen, noticeClosed, closeNotice,
             filterCategory, doSearch, toDetail, toProfile,
             pullDist, refreshing, onTouchStart, onTouchMove, onTouchEnd,
             imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
@@ -350,8 +424,27 @@ const ItemDetail = {
                     <div class="seller-stats" v-if="detail.seller && detail.seller.stats">
                         <span class="stat-item"><b>{{detail.seller.stats.soldCount||0}}</b> 成交</span>
                         <span class="stat-item"><b>{{detail.seller.stats.onSaleCount||0}}</b> 在售</span>
-                        <span class="stat-item"><b>{{fmtPrice(detail.seller.stats.rating||0)}}%</b> 好评</span>
+                        <span class="stat-item"><b>{{sellerRating || '5.0'}}</b> 评分<span v-if="sellerReviewCount"> ({{sellerReviewCount}}评)</span></span>
                     </div>
+                </div>
+            </div>
+
+            <!-- 宝贝评价 -->
+            <div class="detail-section" v-if="reviews.length">
+                <div class="detail-section-title">宝贝评价 ({{reviews.length}})</div>
+                <div class="review-item" v-for="rv in reviews.slice(0, 5)" :key="rv.id">
+                    <div class="review-head">
+                        <div class="review-user">
+                            <img v-if="rv.user && rv.user.avatar" :src="imgUrl(rv.user.avatar)">
+                            <i v-else class="fa fa-user"></i>
+                            <span>{{rv.user ? rv.user.nickname : '匿名'}}</span>
+                        </div>
+                        <div class="review-stars">
+                            <i v-for="n in 5" :key="n" class="fa" :class="n <= rv.rating ? 'fa-star' : 'fa-star-o'"></i>
+                        </div>
+                    </div>
+                    <div class="review-content">{{rv.content || '该用户没有填写评价内容'}}</div>
+                    <div class="review-time">{{shortTime(rv.createdAt)}}</div>
                 </div>
             </div>
 
@@ -377,7 +470,7 @@ const ItemDetail = {
                     <span>{{favorited ? '已收藏' : '收藏'}}</span>
                 </div>
                 <div class="btn-chat" @click="contactSeller" v-if="!isOwner">联系卖家</div>
-                <div class="btn-buy" v-if="!isOwner && detail.status==='在售'" @click="showBuy=true">立即购买</div>
+                <div class="btn-buy" v-if="!isOwner && detail.status==='在售'" @click="openBuy">立即购买</div>
                 <div class="btn-buy" v-if="!isOwner && detail.status==='已售'" style="flex:1;background:#999;">已售出</div>
                 <div class="btn-buy" v-if="!isOwner && detail.status==='下架'" style="flex:1;background:#999;">已下架</div>
                 <div class="btn-buy" v-if="isOwner" style="flex:1;background:#999;">这是您的商品</div>
@@ -388,6 +481,9 @@ const ItemDetail = {
                 <div class="modal-box" style="max-width:340px;">
                     <h3>确认购买</h3>
                     <p style="text-align:left;color:#666;">商品价格：¥{{fmtPrice(detail.price)}}</p>
+                    <div style="text-align:left;font-size:13px;" :style="{color: balanceShort ? '#E74C3C' : '#2ECC71'}">
+                        我的余额：¥{{fmtPrice(myBalance)}}<template v-if="balanceShort">（余额不足，请先充值）</template>
+                    </div>
                     <div class="form-group" style="margin-top:12px;">
                         <label>收货人姓名</label>
                         <input v-model="order.receiverName" placeholder="请输入收货人姓名">
@@ -404,7 +500,8 @@ const ItemDetail = {
                     <div class="fee-hint" v-if="(detail.stock||1) > 1">库存 {{detail.stock}} 件，购买后自动减 1</div>
                     <div class="modal-actions" style="margin-top:16px;">
                         <button class="btn btn-ghost" @click="showBuy=false">取消</button>
-                        <button class="btn btn-primary" :class="{'btn-disabled':submitting}" @click="submitOrder">提交订单</button>
+                        <button class="btn btn-primary" :class="{'btn-disabled':submitting||balanceShort}" @click="balanceShort ? $router.push('/wallet') : submitOrder()">
+                            {{balanceShort ? '去钱包充值' : '提交订单'}}</button>
                     </div>
                 </div>
             </div>
@@ -435,6 +532,26 @@ const ItemDetail = {
         const submitting = ref(false);
         const order = reactive({ receiverName: '', receiverPhone: '', receiverAddress: '' });
         const relatedList = ref([]);
+        const reviews = ref([]);
+        const sellerRating = ref(null);
+        const sellerReviewCount = ref(0);
+        const myBalance = ref(0);
+
+        const balanceShort = computed(() => {
+            const need = parseFloat(detail.value && detail.value.price || 0);
+            return need > 0 && parseFloat(myBalance.value || 0) < need;
+        });
+        // 打开购买弹窗时刷新最新余额
+        async function openBuy() {
+            showBuy.value = true;
+            try {
+                const res = await authApi.getInfo();
+                if (res.data) {
+                    myBalance.value = res.data.balance;
+                    store.setUser(res.data);
+                }
+            } catch (e) {}
+        }
 
         const images = computed(() => (detail.value && detail.value.images) || []);
         const currentImg = computed(() => {
@@ -473,6 +590,16 @@ const ItemDetail = {
             try {
                 const res = await itemApi.related(route.params.id, { limit: 8 });
                 relatedList.value = (res.data || []).slice(0, 4);
+            } catch (e) {}
+            // 卖家真实评分 + 宝贝评价列表
+            try {
+                const sum = await reviewApi.userSummary(detail.value.userId);
+                sellerRating.value = sum.data && sum.data.avgRating;
+                sellerReviewCount.value = sum.data ? sum.data.count : 0;
+            } catch (e) {}
+            try {
+                const rv = await reviewApi.byItem(route.params.id);
+                reviews.value = rv.data || [];
             } catch (e) {}
         }
 
@@ -516,6 +643,7 @@ const ItemDetail = {
         return {
             detail, loading, images, currentImg, imgIdx, favorited, showBuy, lightbox,
             submitting, order, isOwner, sellerIncome, relatedList,
+            reviews, sellerRating, sellerReviewCount, myBalance, balanceShort, openBuy,
             prevImg, nextImg, load, loadRelated, toggleFav, contactSeller, submitOrder,
             imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
         };
@@ -795,7 +923,30 @@ const Orders = {
                     <span class="order-no" v-if="o.status==='已完成'">实付 ¥{{fmtPrice(o.price)}}</span>
                     <button class="btn btn-sm btn-ghost" v-if="o.status==='待发货'" @click="cancel(o.id)"><i class="fa fa-times"></i> 取消订单</button>
                     <button class="btn btn-sm btn-primary" v-if="o.status==='待收货'" @click="confirm(o.id)"><i class="fa fa-check"></i> 确认收货</button>
+                    <button class="btn btn-sm btn-outline" v-if="o.status==='已完成'" @click="openReview(o)"><i class="fa fa-star-o"></i> 评价</button>
                     <button class="btn btn-sm btn-ghost" @click="showDetail(o.id)">详情</button>
+                </div>
+            </div>
+        </div>
+        <!-- 评价弹窗 -->
+        <div class="modal-overlay" v-if="showReview" @click.self="showReview=false">
+            <div class="modal-box" style="max-width:360px;">
+                <div class="ship-head">
+                    <div class="ship-icon" style="background:linear-gradient(135deg,#FF9A44,#FFC371);"><i class="fa fa-star"></i></div>
+                    <h3>评价这次交易</h3>
+                    <p>你的评价会展示给其他买家参考</p>
+                </div>
+                <div style="text-align:center;margin-bottom:14px;">
+                    <i v-for="n in 5" :key="n" class="fa review-star-pick" :class="n <= reviewForm.rating ? 'fa-star' : 'fa-star-o'"
+                       @click="reviewForm.rating = n"
+                       :style="{color: n <= reviewForm.rating ? '#FFB800' : '#ddd', fontSize: '30px', margin: '0 6px', cursor: 'pointer'}"></i>
+                    <div style="font-size:12px;color:#999;margin-top:4px;">{{['', '很差', '较差', '一般', '满意', '超赞'][reviewForm.rating]}}</div>
+                </div>
+                <textarea v-model="reviewForm.content" placeholder="说说宝贝的成色、卖家的服务态度…（选填）"
+                          style="width:100%;box-sizing:border-box;min-height:80px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;outline:none;resize:none;"></textarea>
+                <div class="modal-actions" style="margin-top:14px;">
+                    <button class="btn btn-ghost" @click="showReview=false">取消</button>
+                    <button class="btn btn-primary" @click="submitReview"><i class="fa fa-star"></i> 提交评价</button>
                 </div>
             </div>
         </div>
@@ -858,7 +1009,29 @@ const Orders = {
             try {
                 await orderApi.confirm(id);
                 if (typeof celebrate === 'function') celebrate();
-                showToast('确认收货成功'); load();
+                showToast('确认收货成功，别忘了评价哦'); load();
+            } catch (e) { showToast(e.message); }
+        }
+        // 订单评价
+        const showReview = ref(false);
+        const reviewForm = reactive({ orderId: null, rating: 5, content: '' });
+        async function openReview(o) {
+            try {
+                const res = await reviewApi.byOrder(o.id);
+                if (res.data) { showToast('该订单已评价过'); return; }
+            } catch (e) {}
+            reviewForm.orderId = o.id;
+            reviewForm.rating = 5;
+            reviewForm.content = '';
+            showReview.value = true;
+        }
+        async function submitReview() {
+            try {
+                await reviewApi.create({ orderId: reviewForm.orderId, rating: reviewForm.rating, content: reviewForm.content });
+                if (typeof celebrate === 'function') celebrate();
+                showToast('评价成功');
+                showReview.value = false;
+                load();
             } catch (e) { showToast(e.message); }
         }
         async function showDetail(id) {
@@ -880,7 +1053,8 @@ const Orders = {
             return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
         }
         onMounted(load);
-        return { orders, loading, orderDetail, showDetailModal, cancel, confirm, showDetail, statusClass, statusIcon, shortDate, copyText, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
+        return { orders, loading, orderDetail, showDetailModal, cancel, confirm, showDetail, statusClass, statusIcon, shortDate, copyText,
+                 showReview, reviewForm, openReview, submitReview, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
     }
 };
 
@@ -1357,7 +1531,14 @@ const Wallet = {
         <div class="navbar glass">
             <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
             <div class="navbar-title">资金明细</div>
-            <div class="navbar-right"></div>
+        <div class="navbar-right"></div>
+        </div>
+        <div style="margin:14px 16px 0;padding:18px;border-radius:16px;background:linear-gradient(135deg,#FF9A44,#FF6B35);color:#fff;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <div style="font-size:12px;opacity:.85;">当前余额（元）</div>
+                <div style="font-size:28px;font-weight:700;">¥{{fmtPrice(balance)}}</div>
+            </div>
+            <button class="btn btn-sm" style="background:rgba(255,255,255,0.25);color:#fff;" @click="showRecharge=true; rechargeAmount=50">充值</button>
         </div>
         <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
         <div v-else-if="!flows.length" class="empty-state">
@@ -1380,24 +1561,67 @@ const Wallet = {
                 </div>
             </div>
         </div>
+        <!-- 充值弹窗 -->
+        <div class="modal-overlay" v-if="showRecharge" @click.self="showRecharge=false">
+            <div class="modal-box" style="max-width:340px;">
+                <div class="ship-head">
+                    <div class="ship-icon" style="background:linear-gradient(135deg,#FF9A44,#FF6B35);"><i class="fa fa-jpy"></i></div>
+                    <h3>余额充值</h3>
+                    <p>演示环境模拟到账，即时生效</p>
+                </div>
+                <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px;">
+                    <span class="courier-chip" :class="{on: rechargeAmount==50}" @click="rechargeAmount=50">¥50</span>
+                    <span class="courier-chip" :class="{on: rechargeAmount==100}" @click="rechargeAmount=100">¥100</span>
+                    <span class="courier-chip" :class="{on: rechargeAmount==500}" @click="rechargeAmount=500">¥500</span>
+                    <span class="courier-chip" :class="{on: rechargeAmount==1000}" @click="rechargeAmount=1000">¥1000</span>
+                </div>
+                <div class="ship-field"><i class="fa fa-jpy sf-icon"></i><input type="number" v-model="rechargeAmount" placeholder="自定义金额" min="1"></div>
+                <div class="modal-actions" style="margin-top:14px;">
+                    <button class="btn btn-ghost" @click="showRecharge=false">取消</button>
+                    <button class="btn btn-primary" :class="{'btn-disabled':recharging}" @click="doRecharge"><i class="fa fa-jpy"></i> 确认充值</button>
+                </div>
+            </div>
+        </div>
     </div>`,
     setup() {
         const flows = ref([]);
         const loading = ref(true);
+        const balance = ref(0);
+        const showRecharge = ref(false);
+        const rechargeAmount = ref(50);
+        const recharging = ref(false);
         async function load() {
             loading.value = true;
             try {
                 const res = await userApi.getFundFlows();
                 flows.value = res.data || [];
+                if (flows.value.length) balance.value = flows.value[0].balance;
+                else {
+                    const info = await authApi.getInfo();
+                    balance.value = info.data ? info.data.balance : 0;
+                }
             } catch (e) { showToast(e.message); }
             loading.value = false;
+        }
+        async function doRecharge() {
+            const amt = parseFloat(rechargeAmount.value);
+            if (!amt || amt <= 0) return showToast('请输入正确的充值金额');
+            recharging.value = true;
+            try {
+                const res = await userApi.recharge({ amount: amt });
+                balance.value = res.data ? res.data.balance : balance.value;
+                showToast('充值成功，已到账 ¥' + amt);
+                showRecharge.value = false;
+                load();
+            } catch (e) { showToast(e.message); }
+            recharging.value = false;
         }
         function typeText(t) {
             return { INCOME: '收入', EXPENSE: '支出', WITHDRAW: '提现', RECHARGE: '充值' }[t] || t;
         }
         function isIncome(f) { return f.type === 'INCOME' || f.type === 'RECHARGE'; }
         onMounted(load);
-        return { flows, loading, typeText, isIncome, fmtPrice, shortTime: formatTime };
+        return { flows, loading, balance, showRecharge, rechargeAmount, recharging, doRecharge, typeText, isIncome, fmtPrice, shortTime: formatTime };
     }
 };
 
@@ -1457,7 +1681,7 @@ const app = {
             }
             router.push(p);
         }
-        onMounted(() => { store.loadCategories(); store.refreshUnread(); });
+        onMounted(() => { store.loadCategories(); store.refreshUnread(); store.loadAnnouncement(); });
         return { showTabbar, currentTab, goTab, store, totalUnread: computed(() => store.totalUnread) };
     }
 };

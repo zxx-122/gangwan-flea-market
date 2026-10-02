@@ -35,6 +35,9 @@
             <div class="admin-nav-item" :class="{active: tab==='categories'}" @click="tab='categories'">
                 <i class="fa fa-tags"></i> 分类管理
             </div>
+            <div class="admin-nav-item" :class="{active: tab==='announcements'}" @click="tab='announcements'; loadAnnouncements()">
+                <i class="fa fa-bullhorn"></i> 公告管理
+            </div>
         </nav>
         <div class="admin-nav-bottom">
             <div class="admin-nav-item" @click="backHome"><i class="fa fa-home"></i> 返回首页</div>
@@ -257,6 +260,52 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 公告管理 -->
+            <div v-if="tab==='announcements'">
+                <div class="admin-actions-bar" style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+                    <button class="btn btn-primary" @click="openAnnForm()"><i class="fa fa-plus"></i> 发布公告</button>
+                    <span style="font-size:13px;color:#999;">启用的公告会展示在用户端首页顶部</span>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead><tr><th>ID</th><th>标题</th><th>内容</th><th>状态</th><th>发布时间</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr v-for="a in announcements" :key="a.id">
+                                <td>{{a.id}}</td>
+                                <td class="td-title">{{a.title}}</td>
+                                <td class="td-title" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{a.content||'-'}}</td>
+                                <td><span class="admin-badge" :class="a.enabled===1?'badge-on':'badge-off'">{{a.enabled===1?'展示中':'已停用'}}</span></td>
+                                <td>{{shortTime(a.createdAt)}}</td>
+                                <td class="admin-actions">
+                                    <button class="btn btn-sm btn-primary" @click="openAnnForm(a)">编辑</button>
+                                    <button class="btn btn-sm btn-ghost" @click="toggleAnn(a)">{{a.enabled===1?'停用':'启用'}}</button>
+                                    <button class="btn btn-sm btn-danger" @click="deleteAnn(a.id)">删除</button>
+                                </td>
+                            </tr>
+                            <tr v-if="!announcements.length"><td colspan="6" class="empty-state"><div class="icon"><i class="fa fa-bullhorn"></i></div><div class="text">暂无公告</div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 公告编辑弹窗 -->
+                <div class="modal-overlay" v-if="showAnnForm" @click.self="showAnnForm=false">
+                    <div class="modal-box" style="max-width:420px;">
+                        <h3>{{annEditMode==='create' ? '发布公告' : '编辑公告'}}</h3>
+                        <div class="form-group" style="margin-top:14px;"><label>标题</label><input v-model="annForm.title" placeholder="公告标题（展示在首页横幅）"></div>
+                        <div class="form-group"><label>内容</label><textarea v-model="annForm.content" placeholder="公告详细内容…" style="min-height:100px;resize:vertical;"></textarea></div>
+                        <div class="form-group"><label>状态</label>
+                            <select v-model="annForm.enabled">
+                                <option :value="1">展示中</option>
+                                <option :value="0">已停用</option>
+                            </select>
+                        </div>
+                        <div class="modal-actions" style="margin-top:16px;">
+                            <button class="btn btn-ghost" @click="showAnnForm=false">取消</button>
+                            <button class="btn btn-primary" @click="submitAnn">发布</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 </div>
@@ -274,6 +323,10 @@ createApp({
         const userTotalPages = ref(1), itemTotalPages = ref(1), orderTotalPages = ref(1);
         const userKw = ref(''), itemKw = ref(''), itemStatus = ref('');
         const orderKw = ref(''), orderStatus = ref('');
+        const announcements = ref([]);
+        const showAnnForm = ref(false);
+        const annEditMode = ref('create');
+        const annForm = reactive({ id: null, title: '', content: '', enabled: 1 });
         const showBalanceForm = ref(false);
         const balanceUser = ref(null);
         const balanceValue = ref('');
@@ -357,6 +410,45 @@ createApp({
             try { await adminApi.deleteCategory(id); showToast('已删除'); loadCategories(); }
             catch (e) { showToast(e.message); }
         }
+        async function loadAnnouncements() {
+            try { const res = await announcementApi.list(true); announcements.value = res.data || []; }
+            catch (e) { showToast(e.message); }
+        }
+        function openAnnForm(a) {
+            if (a) {
+                annEditMode.value = 'edit';
+                annForm.id = a.id; annForm.title = a.title;
+                annForm.content = a.content || ''; annForm.enabled = a.enabled;
+            } else {
+                annEditMode.value = 'create';
+                annForm.id = null; annForm.title = '';
+                annForm.content = ''; annForm.enabled = 1;
+            }
+            showAnnForm.value = true;
+        }
+        async function submitAnn() {
+            if (!annForm.title.trim()) return showToast('请输入公告标题');
+            try {
+                if (annEditMode.value === 'create') {
+                    await announcementApi.create({ title: annForm.title, content: annForm.content, enabled: annForm.enabled });
+                    showToast('公告已发布');
+                } else {
+                    await announcementApi.update(annForm.id, { title: annForm.title, content: annForm.content, enabled: annForm.enabled });
+                    showToast('公告已更新');
+                }
+                showAnnForm.value = false;
+                loadAnnouncements();
+            } catch (e) { showToast(e.message); }
+        }
+        async function toggleAnn(a) {
+            try { await announcementApi.update(a.id, { enabled: a.enabled === 1 ? 0 : 1 }); showToast(a.enabled === 1 ? '已停用' : '已启用'); loadAnnouncements(); }
+            catch (e) { showToast(e.message); }
+        }
+        async function deleteAnn(id) {
+            if (!await showModal('确认删除', '删除后用户端将不再显示该公告，确定吗？')) return;
+            try { await announcementApi.remove(id); showToast('已删除'); loadAnnouncements(); }
+            catch (e) { showToast(e.message); }
+        }
         async function setUserStatus(id, status) {
             try { await adminApi.updateUserStatus(id, { status }); showToast(status ? '已启用' : '已禁用'); loadUsers(userPage.value); }
             catch (e) { showToast(e.message); }
@@ -419,7 +511,9 @@ createApp({
                  showBalanceForm, balanceUser, balanceValue, balanceSubmitting, openBalance, submitBalance,
                  barHeight, backHome, logout, fmt, shortTime, imgUrl,
                  categories, showCatForm, catEditMode, catSubmitting, catForm,
-                 loadCategories, openCatForm, submitCategory, deleteCategory };
+                 loadCategories, openCatForm, submitCategory, deleteCategory,
+                 announcements, showAnnForm, annEditMode, annForm,
+                 loadAnnouncements, openAnnForm, submitAnn, toggleAnn, deleteAnn };
     }
 }).mount('#adminApp');
 </script>

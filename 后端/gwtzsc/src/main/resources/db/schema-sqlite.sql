@@ -121,3 +121,27 @@ CREATE TABLE IF NOT EXISTS fund_flow (
 
 CREATE INDEX IF NOT EXISTS idx_fund_flow_user_id ON fund_flow(user_id);
 CREATE INDEX IF NOT EXISTS idx_fund_flow_created_at ON fund_flow(created_at);
+
+-- 订单评价表（一单一评）
+CREATE TABLE IF NOT EXISTS review (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL UNIQUE,
+    item_id INTEGER NOT NULL,
+    from_user_id INTEGER NOT NULL,
+    to_user_id INTEGER NOT NULL,
+    rating INTEGER NOT NULL DEFAULT 5,
+    content TEXT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_item_id ON review(item_id);
+CREATE INDEX IF NOT EXISTS idx_review_to_user ON review(to_user_id);
+
+-- 公告表
+CREATE TABLE IF NOT EXISTS announcement (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT DEFAULT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

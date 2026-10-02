@@ -195,8 +195,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public Map<String, Object> withdraw(Long userId, WithdrawRequest req) {
-        BigDecimal amount = req.getAmount();
+    public void addBalance(User user, BigDecimal amount, String remark) {
+        userMapper.updateById(user);
+        fundFlowService.record(user.getId(), "RECHARGE", amount, user.getBalance(), remark, null);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> withdraw(Long userId, WithdrawRequest req) {        BigDecimal amount = req.getAmount();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("提现金额必须大于0");
         }
