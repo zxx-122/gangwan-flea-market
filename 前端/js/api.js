@@ -156,8 +156,24 @@ function showToast(msg, duration) {
     setTimeout(() => el.remove(), duration);
 }
 
-function showModal(title, msg) {
-    return new Promise(resolve => {
+// 复制文本到剪贴板（用于复制运单号等）
+function copyText(text) {
+    if (!text) return Promise.reject();
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text).then(() => showToast('已复制'));
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); showToast('已复制'); } catch (e) { showToast('复制失败，请手动复制'); }
+    ta.remove();
+    return Promise.resolve();
+}
+
+function showModal(title, msg) {    return new Promise(resolve => {
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
         overlay.innerHTML = [

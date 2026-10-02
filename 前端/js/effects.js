@@ -251,10 +251,19 @@ function pageEnter() {
 document.addEventListener('DOMContentLoaded', () => {
     // 自动初始化环境光斑（若页面未手动写入）
     AmbientBackground.init();
-    // 全局按钮波纹
+    // ========== 全局按钮波纹 ==========
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.btn-primary, .btn-block, .login-btn, .buy-btn');
-        if (btn) rippleEffect.call({ currentTarget: btn }, e);
+        if (!btn) return;
+        const rect = btn.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height) * 2;
+        const x = e.clientX - rect.left - size / 2;
+        const y = e.clientY - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        ripple.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + size + 'px;height:' + size + 'px;';
+        btn.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove());
     });
 });
 

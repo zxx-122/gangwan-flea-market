@@ -1420,3 +1420,52 @@ input[type="tel"] { -webkit-appearance: none; }
     padding: 6px 12px;
     white-space: nowrap;
 }
+
+/* ===================== 订单物流 / 发货美化 ===================== */
+/* 状态徽章：加底色胶囊+图标间距 */
+.order-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+.order-status.pending { background: #fff3ec; }
+.order-status.shipped { background: #ebf5fb; }
+.order-status.done { background: #eafaf1; }
+.order-status.cancelled { background: #f0f0f0; }
+
+/* 物流信息条（买家/卖家订单卡内） */
+.logistics-box { display: flex; align-items: center; gap: 10px; margin: 0 18px; padding: 10px 12px; background: linear-gradient(135deg, #ebf5fb, #f8fbfd); border: 1px solid #d6eaf8; border-radius: 12px; }
+.logistics-box .lg-icon { width: 34px; height: 34px; border-radius: 10px; background: #3498DB; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.logistics-box .lg-info { flex: 1; min-width: 0; }
+.logistics-box .lg-line1 { font-size: 13px; font-weight: 600; color: #2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logistics-box .lg-line2 { font-size: 11px; color: #7f8c8d; margin-top: 2px; }
+.logistics-box .lg-copy { border: none; background: #3498DB; color: #fff; font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; flex-shrink: 0; }
+.logistics-box.done { background: linear-gradient(135deg, #eafaf1, #f6fef9); border-color: #a9dfbf; }
+.logistics-box.done .lg-icon, .logistics-box.done .lg-copy { background: #2ECC71; }
+
+/* 收货信息块（卖家订单卡内） */
+.receiver-box { margin: 0 18px; padding: 10px 12px; background: linear-gradient(135deg, #fdf0e7, #fefaf7); border: 1px solid #f5cba7; border-radius: 12px; font-size: 12px; color: #5d4037; line-height: 1.9; }
+.receiver-box .rb-title { font-weight: 600; color: #e67e22; display: flex; align-items: center; gap: 6px; }
+
+/* 发货弹窗 */
+.ship-head { text-align: center; padding: 4px 0 10px; }
+.ship-head .ship-icon { width: 56px; height: 56px; margin: 0 auto 10px; border-radius: 50%; background: linear-gradient(135deg, #3498DB, #5DADE2); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 6px 16px rgba(52,152,219,.35); }
+.ship-head h3 { margin: 0; }
+.ship-head p { margin: 6px 0 0; }
+.courier-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+.courier-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: #fff; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all .15s; }
+.courier-chip.on { background: linear-gradient(135deg, #3498DB, #5DADE2); border-color: transparent; color: #fff; font-weight: 600; box-shadow: 0 4px 10px rgba(52,152,219,.3); }
+.ship-field { position: relative; margin-bottom: 12px; }
+.ship-field .sf-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 14px; }
+.ship-field input { width: 100%; box-sizing: border-box; padding: 11px 12px 11px 36px; border: 1.5px solid var(--border); border-radius: 12px; font-size: 14px; outline: none; transition: border .15s; background: #fbfcfe; }
+.ship-field input:focus { border-color: #3498DB; background: #fff; box-shadow: 0 0 0 3px rgba(52,152,219,.12); }
+
+/* 订单详情：进度时间线 + 信息块 */
+.od-steps { display: flex; align-items: flex-start; margin: 14px 0 4px; }
+.od-step { flex: 1; text-align: center; position: relative; }
+.od-step .step-line { position: absolute; top: 11px; left: -50%; width: 100%; height: 2px; background: #e0e0e0; }
+.od-step.done .step-line { background: var(--primary); }
+.od-step .dot { width: 22px; height: 22px; border-radius: 50%; background: #e0e0e0; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; position: relative; z-index: 1; }
+.od-step.done .dot { background: var(--primary); }
+.od-step .step-label { font-size: 11px; color: var(--text-light); margin-top: 6px; }
+.od-step.done .step-label { color: var(--text-primary); font-weight: 600; }
+.od-step .step-time { font-size: 10px; color: var(--text-light); margin-top: 2px; min-height: 14px; }
+.od-section { background: #f8f9fb; border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #333; line-height: 2; margin-top: 10px; text-align: left; }
+.od-section .od-row { display: flex; justify-content: space-between; gap: 10px; }
+.od-section .od-row b { font-weight: 600; color: var(--text-primary); }
