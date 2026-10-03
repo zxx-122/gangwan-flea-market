@@ -1,0 +1,39 @@
+<view class="page">
+  <block wx:if="{{!searchMode}}">
+    <view class="nav-row">
+      <view class="nav-back" bindtap="goBack">‹</view>
+      <view class="nav-title">浏览历史</view>
+      <view class="nav-clear" bindtap="clearAll" wx:if="{{list.length}}">清空</view>
+    </view>
+    <view class="empty" wx:if="{{loading}}">加载中...</view>
+    <view class="empty" wx:elif="{{!list.length}}">还没有浏览记录
+      <view class="sub">去首页逛逛，看过的宝贝会出现在这里</view>
+    </view>
+    <view class="h-card" wx:for="{{list}}" wx:key="id" bindtap="goDetail" data-id="{{item.id}}">
+      <image class="h-img" src="{{item.img}}" mode="aspectFill" lazy-load />
+      <view class="h-info">
+        <view class="h-title">{{item.title}}</view>
+        <view class="h-price price">¥{{item.priceTxt}}</view>
+        <view class="h-time">浏览于 {{item.time}}</view>
+      </view>
+      <view class="h-arrow">›</view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="nav-row">
+      <view class="nav-back" bindtap="goBack">‹</view>
+      <view class="nav-title">搜索：{{keyword}}</view>
+    </view>
+    <view class="empty" wx:if="{{loading}}">搜索中...</view>
+    <view class="empty" wx:elif="{{!searchResults.length}}">没有找到相关商品</view>
+    <view class="h-card" wx:for="{{searchResults}}" wx:key="id" bindtap="goDetail" data-id="{{item.id}}">
+      <image class="h-img" src="{{item.img}}" mode="aspectFill" lazy-load />
+      <view class="h-info">
+        <view class="h-title">{{item.title}}</view>
+        <view class="h-price price">¥{{item.priceTxt}}</view>
+      </view>
+      <view class="h-arrow">›</view>
+    </view>
+  </block>
+</view>

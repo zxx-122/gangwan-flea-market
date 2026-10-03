@@ -1,0 +1,8 @@
+.page { padding: 20rpx 24rpx 40rpx; }
+.fav-card { background: #fff; border-radius: 20rpx; padding: 20rpx; margin-bottom: 18rpx; box-shadow: 0 4rpx 16rpx rgba(255,122,69,.08); }
+.fav-body { display: flex; align-items: center; gap: 16rpx; }
+.fav-img { width: 140rpx; height: 140rpx; border-radius: 14rpx; background: #f7f7f7; flex-shrink: 0; }
+.fav-info { flex: 1; }
+.fav-title { font-size: 27rpx; color: #333; }
+.fav-price { font-size: 30rpx; margin: 10rpx 0; }
+.fav-del { font-size: 36rpx; padding: 10rpx; }

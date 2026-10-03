@@ -1,0 +1,79 @@
+<view class="page" wx:if="{{detail}}">
+  <swiper class="banner" wx:if="{{imgs.length}}" current="{{cur}}">
+    <swiper-item wx:for="{{imgs}}" wx:key="*this" bindtap="preview">
+      <image src="{{item}}" mode="aspectFill" class="banner-img" />
+    </swiper-item>
+  </swiper>
+  <view class="banner banner-empty" wx:else><text>🛍️</text></view>
+  <view class="dots" wx:if="{{imgs.length>1}}">{{cur+1}} / {{imgs.length}}</view>
+
+  <view class="body card">
+    <view class="price">¥{{detail.price}}</view>
+    <view class="title">{{detail.title}}</view>
+    <view class="tags">
+      <text class="tag" wx:if="{{detail.condition}}">{{detail.condition}}</text>
+      <text class="tag" wx:if="{{detail.categoryName}}">{{detail.categoryName}}</text>
+      <text class="tag">库存 {{detail.stock == null ? 1 : detail.stock}} 件</text>
+      <text class="tag">{{detail.views || 0}} 浏览</text>
+    </view>
+    <view class="desc">{{detail.description || '暂无描述'}}</view>
+  </view>
+
+  <view class="card seller-card">
+    <view class="seller-row">
+      <view>
+        <view class="seller-name">{{detail.seller ? detail.seller.nickname || detail.seller.username : '匿名卖家'}}</view>
+        <view class="seller-meta">发布于 {{detail.createdAt}}</view>
+      </view>
+      <view class="seller-stats">
+        <text>{{detail.seller.stats.soldCount || 0}} 成交</text>
+        <text>{{detail.seller.stats.onSaleCount || 0}} 在售</text>
+        <text>评分 {{sellerRating || '5.0'}}</text>
+      </view>
+    </view>
+    <view class="report-link" bindtap="report">⚠️ 举报此商品</view>
+  </view>
+
+  <view class="card review-card" wx:if="{{reviews.length}}">
+    <view class="sec-title">宝贝评价 ({{reviews.length}})</view>
+    <view class="review" wx:for="{{reviews}}" wx:key="id">
+      <view class="review-head">
+        <text class="review-user">{{item.nickname}}</text>
+        <text class="stars">{{item.rating}} 星</text>
+      </view>
+      <view class="review-content">{{item.content || '该用户没有填写评价内容'}}</view>
+      <view class="review-time">{{item.time}}</view>
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <view class="bar-item" bindtap="toggleFav">
+      <text>{{favorited ? '❤️' : '🤍'}}</text>
+      <text class="bar-label">收藏</text>
+    </view>
+    <view class="bar-item" bindtap="contact">
+      <text>💬</text>
+      <text class="bar-label">联系卖家</text>
+    </view>
+    <view class="buy-btn" wx:if="{{!isOwner && detail.status==='在售'}}" bindtap="openBuy">立即购买</view>
+    <view class="buy-btn disabled" wx:if="{{!isOwner && detail.status==='已售'}}">已售出</view>
+    <view class="buy-btn disabled" wx:if="{{!isOwner && detail.status==='下架'}}">已下架</view>
+    <view class="buy-btn disabled" wx:if="{{isOwner}}">这是您的商品</view>
+  </view>
+
+  <view class="mask" wx:if="{{showBuy}}" bindtap="closeBuy">
+    <view class="buy-modal" catchtap="noop">
+      <view class="bm-title">确认购买</view>
+      <view class="bm-price">商品价格：¥{{detail.price}}</view>
+      <view class="bm-balance {{balanceShort ? 'short' : ''}}">我的余额：¥{{myBalance}}{{balanceShort ? '（余额不足，请先充值）' : ''}}</view>
+      <input class="bm-input" placeholder="收货人姓名" value="{{order.receiverName}}" data-field="receiverName" bindinput="onOrderInput" />
+      <input class="bm-input" placeholder="联系电话" type="number" value="{{order.receiverPhone}}" data-field="receiverPhone" bindinput="onOrderInput" />
+      <input class="bm-input" placeholder="详细收货地址" value="{{order.receiverAddress}}" data-field="receiverAddress" bindinput="onOrderInput" />
+      <view class="fee-hint">确认收货后自动结算 · 平台抽成 1.6%</view>
+      <view class="bm-actions">
+        <button class="ghost-btn bm-btn" bindtap="closeBuy">取消</button>
+        <button class="btn-primary bm-btn" bindtap="submitOrder">{{balanceShort ? '去钱包充值' : '提交订单'}}</button>
+      </view>
+    </view>
+  </view>
+</view>

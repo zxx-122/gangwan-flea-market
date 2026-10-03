@@ -1,0 +1,11 @@
+.page { padding-bottom: 40rpx; }
+.msg-item { display: flex; align-items: center; gap: 20rpx; background: #fff; margin: 14rpx 24rpx 0; border-radius: 18rpx; padding: 22rpx; }
+.avatar-wrap { position: relative; }
+.avatar { width: 88rpx; height: 88rpx; border-radius: 50%; background: #fff3ec; }
+.avatar-txt { display: flex; align-items: center; justify-content: center; color: #FF7A45; font-size: 36rpx; font-weight: 600; }
+.badge { position: absolute; top: -6rpx; right: -6rpx; background: #FF4D4F; color: #fff; font-size: 18rpx; min-width: 32rpx; height: 32rpx; border-radius: 16rpx; text-align: center; line-height: 32rpx; padding: 0 6rpx; }
+.msg-info { flex: 1; min-width: 0; }
+.msg-name { font-size: 28rpx; font-weight: 600; color: #333; }
+.msg-last { font-size: 24rpx; color: #999; margin-top: 6rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-time { font-size: 20rpx; color: #ccc; }
+.sub { font-size: 22rpx; color: #ccc; margin-top: 10rpx; }

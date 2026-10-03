@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="header">
+    <view class="hello">{{user ? user.nickname || user.username : '游客'}}，逛逛校园好物</view>
+  </view>
+  <view class="search-bar">
+    <input placeholder="搜索你想要的宝贝" value="{{keyword}}" bindinput="onSearch" bindconfirm="doSearch" confirm-type="search" />
+    <view class="search-btn" bindtap="doSearch">搜索</view>
+  </view>
+
+  <view class="notice" wx:if="{{announcement}}" bindtap="openAnn">
+    <text class="notice-icon">📣</text>
+    <text class="notice-text">{{announcement.title}}</text>
+    <text class="notice-close" catchtap="openAnn">✕</text>
+  </view>
+
+  <scroll-view scroll-x class="cat-scroll">
+    <view class="cat-row">
+      <view class="cat-chip {{activeCat===null?'on':''}}" data-id="" bindtap="pickCat">全部</view>
+      <view class="cat-chip {{activeCat===c.id?'on':''}}" wx:for="{{categories}}" wx:key="id" data-id="{{c.id}}" bindtap="pickCat">{{c.name}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="sort-row">
+    <view class="sort-chip {{activeSort===s.key?'on':''}}" wx:for="{{sorts}}" wx:key="key" data-key="{{s.key}}" bindtap="pickSort">{{s.label}}</view>
+  </view>
+
+  <view class="goods-list">
+    <view class="goods-card" wx:for="{{items}}" wx:key="id" bindtap="goDetail" data-id="{{item.id}}">
+      <image class="goods-img" src="{{item.img}}" mode="aspectFill" lazy-load />
+      <view class="goods-info">
+        <view class="goods-title">{{item.title}}</view>
+        <view class="goods-price">¥{{item.priceTxt}}</view>
+        <view class="goods-meta">{{item.views}}浏览 · 库存{{item.stock}}件</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{!loading && !items.length}}">暂无商品，点右下角发布闲置吧</view>
+  <view class="load-more" wx:if="{{loading}}">加载中...</view>
+  <view class="load-more" wx:if="{{noMore && items.length}}">— 没有更多了 —</view>
+</view>

@@ -1,0 +1,13 @@
+.chat-room { display: flex; flex-direction: column; height: 100vh; background: #fff7f2; }
+.msgs { flex: 1; padding: 20rpx 24rpx; box-sizing: border-box; }
+.msg-row { display: flex; flex-direction: column; margin-bottom: 18rpx; align-items: flex-start; }
+.msg-row.self { align-items: flex-end; }
+.bubble { max-width: 70%; padding: 18rpx 24rpx; font-size: 28rpx; line-height: 1.6; border-radius: 18rpx; }
+.bub-other { background: #fff; color: #333; border-top-left-radius: 4rpx; box-shadow: 0 2rpx 8rpx rgba(0,0,0,.04); }
+.bub-self { background: linear-gradient(135deg, #FF9A44, #FF7A45); color: #fff; border-top-right-radius: 4rpx; }
+.msg-time { font-size: 18rpx; color: #ccc; margin-top: 6rpx; }
+.quick-row { display: flex; gap: 12rpx; padding: 12rpx 20rpx; overflow-x: auto; white-space: nowrap; background: #fff; }
+.quick-chip { flex-shrink: 0; padding: 8rpx 22rpx; background: #fff3ec; color: #FF7A45; border-radius: 999rpx; font-size: 23rpx; }
+.input-bar { display: flex; align-items: center; gap: 16rpx; background: #fff; padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); }
+.chat-inp { flex: 1; background: #f5f5f5; border-radius: 999rpx; padding: 16rpx 28rpx; font-size: 27rpx; }
+.send-btn { background: linear-gradient(135deg, #FF9A44, #FF7A45); color: #fff; font-size: 26rpx; padding: 14rpx 34rpx; border-radius: 999rpx; }

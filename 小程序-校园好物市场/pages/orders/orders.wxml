@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="empty" wx:if="{{loading}}">加载中...</view>
+  <view class="empty" wx:elif="{{!orders.length}}">还没有订单，去首页逛逛吧</view>
+  <view class="order-card" wx:for="{{orders}}" wx:key="id">
+    <view class="o-head">
+      <text class="o-no">订单号：{{item.orderNo}}</text>
+      <text class="o-status s-{{item.status}}">{{item.status}}</text>
+    </view>
+    <view class="o-body" bindtap="goDetail" data-id="{{item.itemId}}">
+      <image class="o-img" src="{{item.img}}" mode="aspectFill" lazy-load />
+      <view class="o-info">
+        <view class="o-title">{{item.itemTitle}}</view>
+        <view class="o-price price">¥{{item.priceTxt}}</view>
+      </view>
+    </view>
+    <view class="logi" wx:if="{{item.courier && (item.status==='待收货' || item.status==='已完成')}}"
+          data-t="{{item.tracking}}" bindtap="copyTracking">
+      🚚 {{item.courier}} {{item.tracking}} · 点击复制
+    </view>
+    <view class="o-actions">
+      <button class="ghost-btn mini" wx:if="{{item.status==='待发货'}}" data-id="{{item.id}}" bindtap="cancel">取消订单</button>
+      <button class="btn-primary mini" wx:if="{{item.status==='待收货'}}" data-id="{{item.id}}" bindtap="confirmReceipt">确认收货</button>
+      <button class="ghost-btn mini" wx:if="{{item.status==='已完成'}}" data-id="{{item.id}}" bindtap="review">⭐ 评价卖家</button>
+      <text class="paid" wx:if="{{item.status==='已完成'}}">实付 ¥{{item.priceTxt}}</text>
+    </view>
+  </view>
+</view>

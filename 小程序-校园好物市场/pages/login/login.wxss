@@ -1,0 +1,13 @@
+.login-page { min-height: 100vh; background: linear-gradient(180deg, #fff3ec, #fff7f2 40%); padding: 100rpx 50rpx; box-sizing: border-box; }
+.logo-circle { width: 140rpx; height: 140rpx; border-radius: 50%; background: linear-gradient(135deg, #FF9A44, #FF7A45); display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 0 12rpx 30rpx rgba(255,122,69,.35); }
+.logo-icon { font-size: 64rpx; }
+.login-title { text-align: center; font-size: 40rpx; font-weight: 700; margin-top: 24rpx; color: #333; }
+.login-sub { text-align: center; font-size: 24rpx; color: #999; margin: 10rpx 0 50rpx; }
+.login-card { background: #fff; border-radius: 28rpx; padding: 40rpx 36rpx; box-shadow: 0 8rpx 30rpx rgba(255,122,69,.10); }
+.tabs { display: flex; margin-bottom: 30rpx; }
+.tab { flex: 1; text-align: center; padding: 18rpx 0; font-size: 28rpx; color: #999; border-radius: 16rpx; }
+.tab.on { color: #FF7A45; font-weight: 700; background: #fff3ec; }
+.field { margin-bottom: 24rpx; }
+.field input { background: #f8f8f8; border-radius: 16rpx; padding: 22rpx 24rpx; font-size: 28rpx; }
+.submit { margin-top: 40rpx; }
+.hint { text-align: center; font-size: 22rpx; color: #bbb; margin-top: 24rpx; }

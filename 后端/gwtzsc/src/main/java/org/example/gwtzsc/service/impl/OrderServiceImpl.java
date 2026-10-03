@@ -224,4 +224,29 @@ public class OrderServiceImpl implements OrderService {
             return map;
         }).collect(Collectors.toList());
     }
+
+    /** 系统自动取消：下单超过 48 小时仍待发货的订单，回补库存并恢复商品在售 */
+    @Override
+    @Transactional
+    public int autoCancelExpired() {
+        java.time.LocalDateTime deadline = LocalDateTime.now().minusHours(48);
+        List<Order> expired = orderMapper.selectList(
+                new LambdaQueryWrapper<Order>()
+                        .eq(Order::getStatus, "待发货")
+                        .lt(Order::getCreatedAt, deadline));
+        for (Order order : expired) {
+            order.setStatus("已取消");
+            orderMapper.updateById(order);
+            Item item = itemMapper.selectById(order.getItemId());
+            if (item != null) {
+                int stock = item.getStock() == null ? 1 : item.getStock();
+                item.setStock(stock + 1);
+                if ("已售".equals(item.getStatus())) item.setStatus("在售");
+                itemMapper.updateById(item);
+                redisTemplate.delete("item:" + item.getId());
+            }
+            clearHomeItemCache();
+        }
+        return expired.size();
+    }
 }

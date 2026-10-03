@@ -1,0 +1,40 @@
+.page { padding-bottom: 140rpx; }
+.banner { width: 100%; height: 560rpx; }
+.banner-img { width: 100%; height: 560rpx; }
+.banner-empty { display: flex; align-items: center; justify-content: center; background: #f0f0f0; font-size: 100rpx; }
+.dots { text-align: center; font-size: 22rpx; color: #999; padding: 10rpx; }
+.body { margin: 20rpx 24rpx; padding: 24rpx; }
+.price { font-size: 44rpx; font-weight: 700; color: #FF6B35; }
+.title { font-size: 32rpx; font-weight: 600; margin: 10rpx 0 16rpx; }
+.tags { display: flex; flex-wrap: wrap; gap: 10rpx; }
+.desc { font-size: 27rpx; color: #555; line-height: 1.8; margin-top: 18rpx; }
+.seller-card { margin: 0 24rpx 20rpx; padding: 20rpx 24rpx; }
+.seller-row { display: flex; align-items: center; justify-content: space-between; }
+.seller-name { font-size: 28rpx; font-weight: 600; }
+.seller-meta { font-size: 22rpx; color: #bbb; margin-top: 6rpx; }
+.seller-stats { display: flex; flex-direction: column; align-items: flex-end; font-size: 22rpx; color: #999; gap: 4rpx; }
+.report-link { font-size: 22rpx; color: #ccc; text-align: right; margin-top: 12rpx; }
+.review-card { margin: 0 24rpx 20rpx; padding: 20rpx 24rpx; }
+.sec-title { font-size: 28rpx; font-weight: 700; margin-bottom: 16rpx; }
+.review { padding: 14rpx 0; border-bottom: 1rpx solid #f5f5f5; }
+.review:last-child { border-bottom: none; }
+.review-head { display: flex; justify-content: space-between; }
+.review-user { font-size: 24rpx; font-weight: 600; }
+.stars { font-size: 22rpx; color: #FFB800; }
+.review-content { font-size: 25rpx; color: #666; margin-top: 8rpx; }
+.review-time { font-size: 20rpx; color: #ccc; margin-top: 6rpx; }
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom)); box-shadow: 0 -4rpx 16rpx rgba(0,0,0,.05); z-index: 10; }
+.bar-item { width: 120rpx; display: flex; flex-direction: column; align-items: center; font-size: 30rpx; }
+.bar-label { font-size: 20rpx; color: #666; }
+.buy-btn { flex: 1; margin-left: 16rpx; background: linear-gradient(135deg, #FF9A44, #FF7A45); color: #fff; border-radius: 44rpx; text-align: center; padding: 20rpx 0; font-size: 30rpx; font-weight: 600; }
+.buy-btn.disabled { background: #ccc; }
+.mask { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 20; display: flex; align-items: center; justify-content: center; }
+.buy-modal { width: 86%; background: #fff; border-radius: 24rpx; padding: 36rpx; }
+.bm-title { text-align: center; font-size: 32rpx; font-weight: 700; }
+.bm-price { font-size: 26rpx; color: #666; margin: 16rpx 0 8rpx; }
+.bm-balance { font-size: 24rpx; color: #2ECC71; margin-bottom: 16rpx; }
+.bm-balance.short { color: #E74C3C; }
+.bm-input { background: #f8f8f8; border-radius: 14rpx; padding: 18rpx 20rpx; font-size: 26rpx; margin-bottom: 18rpx; }
+.fee-hint { font-size: 20rpx; color: #999; margin-bottom: 10rpx; }
+.bm-actions { display: flex; gap: 16rpx; margin-top: 10rpx; }
+.bm-btn { flex: 1; font-size: 28rpx; padding: 6rpx 0; }

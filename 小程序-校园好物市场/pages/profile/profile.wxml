@@ -1,0 +1,41 @@
+<view class="page" wx:if="{{user}}">
+  <view class="head">
+    <view class="avatar">{{user.nickname ? user.nickname[0] : 'U'}}</view>
+    <view class="head-info">
+      <view class="nick">{{user.nickname || user.username}}</view>
+      <view class="sub">账号：{{user.username}}</view>
+    </view>
+    <view class="bal">¥{{balanceTxt}}</view>
+  </view>
+
+  <view class="stat-row">
+    <view class="stat" bindtap="go" data-url="/pages/orders/orders">
+      <view class="stat-num">{{stats.soldCount || 0}}</view>
+      <view class="stat-label">已卖出</view>
+    </view>
+    <view class="stat" bindtap="go" data-url="/pages/sales/sales">
+      <view class="stat-num">{{stats.onSaleCount || 0}}</view>
+      <view class="stat-label">我的发布</view>
+    </view>
+    <view class="stat" bindtap="go" data-url="/pages/wallet/wallet">
+      <view class="stat-num">💰</view>
+      <view class="stat-label">钱包</view>
+    </view>
+  </view>
+
+  <view class="menu">
+    <view class="menu-item" bindtap="go" data-url="/pages/orders/orders"><text class="mi-icon">🧾</text><text>我买到的</text><text class="arrow">›</text></view>
+    <view class="menu-item" bindtap="go" data-url="/pages/sales/sales"><text class="mi-icon">🏷️</text><text>我卖出的</text><text class="arrow">›</text></view>
+    <view class="menu-item" bindtap="go" data-url="/pages/favorites/favorites"><text class="mi-icon">❤️</text><text>我的收藏</text><text class="arrow">›</text></view>
+    <view class="menu-item" bindtap="go" data-url="/pages/history/history"><text class="mi-icon">🕘</text><text>浏览历史</text><text class="arrow">›</text></view>
+    <view class="menu-item" bindtap="go" data-url="/pages/wallet/wallet"><text class="mi-icon">💰</text><text>钱包与提现</text><text class="arrow">›</text></view>
+    <view class="menu-item" bindtap="togglePwd"><text class="mi-icon">🔒</text><text>修改密码</text><text class="arrow">{{showPwd ? '⌄' : '›'}}</text></view>
+    <view class="pwd-box" wx:if="{{showPwd}}">
+      <input class="pwd-inp" password placeholder="原密码" value="{{oldPwd}}" data-field="oldPwd" bindinput="onPwd" />
+      <input class="pwd-inp" password placeholder="新密码（至少6位）" value="{{newPwd}}" data-field="newPwd" bindinput="onPwd" />
+      <button class="btn-primary pwd-save" bindtap="savePwd">保存新密码</button>
+    </view>
+    <view class="menu-item" bindtap="goAdmin"><text class="mi-icon">🛡️</text><text>管理后台</text><text class="arrow">›</text></view>
+    <view class="menu-item" bindtap="logout"><text class="mi-icon">🚪</text><text style="color:#e74c3c;">退出登录</text><text class="arrow">›</text></view>
+  </view>
+</view>

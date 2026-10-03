@@ -147,3 +147,16 @@ CREATE TABLE IF NOT EXISTS announcement (
     enabled INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 举报表
+CREATE TABLE IF NOT EXISTS report (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reporter_id INTEGER NOT NULL,
+    target_type TEXT NOT NULL DEFAULT 'ITEM',
+    target_id INTEGER NOT NULL,
+    reason TEXT DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT '待处理',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_report_status ON report(status);
+

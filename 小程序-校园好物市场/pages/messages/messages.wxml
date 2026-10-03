@@ -1,0 +1,18 @@
+<view class="page">
+  <view class="empty" wx:if="{{loading}}">加载中...</view>
+  <view class="empty" wx:elif="{{!sessions.length}}">还没有聊天消息
+    <view class="sub">在商品详情页联系卖家即可发起聊天</view>
+  </view>
+  <view class="msg-item" wx:for="{{sessions}}" wx:key="userId" bindtap="goChat" data-id="{{item.userId}}">
+    <view class="avatar-wrap">
+      <image class="avatar" src="{{item.avatar}}" mode="aspectFill" wx:if="{{item.avatar}}" />
+      <view class="avatar avatar-txt" wx:else>{{item.name[0]}}</view>
+      <view class="badge" wx:if="{{item.unread}}">{{item.unread}}</view>
+    </view>
+    <view class="msg-info">
+      <view class="msg-name">{{item.name}}</view>
+      <view class="msg-last">{{item.last}}</view>
+    </view>
+    <view class="msg-time">{{item.time}}</view>
+  </view>
+</view>

@@ -426,6 +426,9 @@ const ItemDetail = {
                         <span class="stat-item"><b>{{detail.seller.stats.onSaleCount||0}}</b> 在售</span>
                         <span class="stat-item"><b>{{sellerRating || '5.0'}}</b> 评分<span v-if="sellerReviewCount"> ({{sellerReviewCount}}评)</span></span>
                     </div>
+                    <div style="width:100%;text-align:right;margin-top:6px;">
+                        <span style="font-size:11px;color:#bbb;cursor:pointer;" @click="openReport"><i class="fa fa-warning"></i> 举报此商品</span>
+                    </div>
                 </div>
             </div>
 
@@ -506,6 +509,25 @@ const ItemDetail = {
                 </div>
             </div>
 
+            <!-- 举报弹窗 -->
+            <div class="modal-overlay" v-if="showReport" @click.self="showReport=false">
+                <div class="modal-box" style="max-width:340px;">
+                    <div class="ship-head">
+                        <div class="ship-icon" style="background:linear-gradient(135deg,#e74c3c,#ff6b6b);"><i class="fa fa-warning"></i></div>
+                        <h3>举报此商品</h3>
+                        <p>管理员会尽快核实处理</p>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                        <span class="courier-chip" v-for="r in reportReasons" :key="r" :class="{on: reportReason===r}" @click="reportReason=r">{{r}}</span>
+                    </div>
+                    <textarea v-model="reportReason" placeholder="请描述举报原因（必填）"
+                              style="width:100%;box-sizing:border-box;min-height:70px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;outline:none;resize:none;"></textarea>
+                    <div class="modal-actions" style="margin-top:14px;">
+                        <button class="btn btn-ghost" @click="showReport=false">取消</button>
+                        <button class="btn btn-primary" style="background:linear-gradient(135deg,#e74c3c,#ff6b6b);" @click="submitReport">提交举报</button>
+                    </div>
+                </div>
+            </div>
             <!-- 灯箱 -->
             <div class="lightbox-overlay" v-if="lightbox" @click="lightbox=false">
                 <span class="lightbox-close" @click="lightbox=false"><i class="fa fa-times"></i></span>
@@ -536,6 +558,22 @@ const ItemDetail = {
         const sellerRating = ref(null);
         const sellerReviewCount = ref(0);
         const myBalance = ref(0);
+        const showReport = ref(false);
+        const reportReason = ref('');
+        const reportReasons = ['虚假商品', '违禁物品', '涉嫌欺诈', '描述严重不符', '其他违规'];
+        function openReport() {
+            if (!requireLogin(router)) return;
+            reportReason.value = '';
+            showReport.value = true;
+        }
+        async function submitReport() {
+            if (!reportReason.value.trim()) return showToast('请选择或填写举报原因');
+            try {
+                await reportApi.create({ targetType: 'ITEM', targetId: route.params.id, reason: reportReason.value.trim() });
+                showToast('举报已提交，感谢您的反馈');
+                showReport.value = false;
+            } catch (e) { showToast(e.message); }
+        }
 
         const balanceShort = computed(() => {
             const need = parseFloat(detail.value && detail.value.price || 0);
@@ -655,6 +693,7 @@ const ItemDetail = {
             detail, loading, images, currentImg, imgIdx, favorited, showBuy, lightbox,
             submitting, order, isOwner, sellerIncome, relatedList,
             reviews, sellerRating, sellerReviewCount, myBalance, balanceShort, openBuy,
+            showReport, reportReason, reportReasons, openReport, submitReport,
             prevImg, nextImg, load, loadRelated, toggleFav, contactSeller, submitOrder,
             imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
         };

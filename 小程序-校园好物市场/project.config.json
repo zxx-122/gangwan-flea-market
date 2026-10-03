@@ -1,0 +1,24 @@
+{
+  "description": "校园好物市场 - 港湾跳蚤市场小程序端",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.4.3",
+  "appid": "touristappid",
+  "projectname": "campus-good-market",
+  "condition": {}
+}

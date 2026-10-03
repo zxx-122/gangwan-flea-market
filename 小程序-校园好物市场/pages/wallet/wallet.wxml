@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="bal-card">
+    <view class="bal-label">当前余额（元）</view>
+    <view class="bal-num">¥{{balance}}</view>
+    <view class="bal-actions">
+      <button class="bal-btn" bindtap="openRecharge">充值</button>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{loading}}">加载中...</view>
+  <view class="empty" wx:elif="{{!flows.length}}">暂无资金流水</view>
+  <view class="flow" wx:for="{{flows}}" wx:key="id">
+    <view class="flow-info">
+      <view class="flow-type">{{item.typeTxt}}</view>
+      <view class="flow-remark" wx:if="{{item.remark}}">{{item.remark}}</view>
+      <view class="flow-time">{{item.time}}</view>
+    </view>
+    <view class="flow-right">
+      <view class="flow-amount" style="color:{{item.income ? '#FF6B35' : '#00b894'}};">{{item.income ? '+' : '-'}}¥{{item.amountTxt}}</view>
+      <view class="flow-bal">余额 ¥{{item.balanceTxt}}</view>
+    </view>
+  </view>
+
+  <view class="mask" wx:if="{{showRecharge}}" bindtap="closeRecharge">
+    <view class="re-modal" catchtap="noop">
+      <view class="rm-title">余额充值</view>
+      <view class="rm-sub">演示环境模拟到账，即时生效</view>
+      <view class="rm-quick">
+        <text class="chip" data-v="50" bindtap="pick">¥50</text>
+        <text class="chip" data-v="100" bindtap="pick">¥100</text>
+        <text class="chip" data-v="500" bindtap="pick">¥500</text>
+        <text class="chip" data-v="1000" bindtap="pick">¥1000</text>
+      </view>
+      <input class="rm-input" type="digit" placeholder="自定义金额" value="{{amount}}" bindinput="onAmount" />
+      <view class="rm-actions">
+        <button class="ghost-btn rm-btn" bindtap="closeRecharge">取消</button>
+        <button class="btn-primary rm-btn" loading="{{recharging}}" bindtap="doRecharge">确认充值</button>
+      </view>
+    </view>
+  </view>
+</view>

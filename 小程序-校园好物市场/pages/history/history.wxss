@@ -1,0 +1,13 @@
+.page { padding-bottom: 40rpx; }
+.nav-row { display: flex; align-items: center; padding: 24rpx 30rpx; }
+.nav-back { font-size: 50rpx; color: #666; margin-right: 24rpx; line-height: 1; }
+.nav-title { font-size: 32rpx; font-weight: 700; color: #333; flex: 1; }
+.nav-clear { font-size: 24rpx; color: #999; }
+.h-card { display: flex; align-items: center; gap: 16rpx; background: #fff; margin: 14rpx 24rpx 0; border-radius: 18rpx; padding: 20rpx; }
+.h-img { width: 130rpx; height: 130rpx; border-radius: 14rpx; background: #f7f7f7; flex-shrink: 0; }
+.h-info { flex: 1; min-width: 0; }
+.h-title { font-size: 27rpx; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-price { font-size: 28rpx; margin-top: 8rpx; }
+.h-time { font-size: 20rpx; color: #ccc; margin-top: 6rpx; }
+.h-arrow { color: #ccc; font-size: 36rpx; }
+.sub { font-size: 22rpx; color: #ccc; margin-top: 10rpx; }

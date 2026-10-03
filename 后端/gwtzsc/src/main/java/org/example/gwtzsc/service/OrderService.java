@@ -14,4 +14,7 @@ public interface OrderService {
     void confirm(Long buyerId, Long orderId);
     void cancel(Long buyerId, Long orderId);
     Order getById(Long id);
+
+    /** 系统自动取消超时未发货订单（下单超过48小时仍是待发货），返回取消数量 */
+    int autoCancelExpired();
 }

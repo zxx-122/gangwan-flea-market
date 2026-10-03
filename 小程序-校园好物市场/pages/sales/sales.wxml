@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="empty" wx:if="{{loading}}">加载中...</view>
+  <view class="empty" wx:elif="{{!orders.length}}">还没有卖单</view>
+  <view class="order-card" wx:for="{{orders}}" wx:key="id">
+    <view class="o-head">
+      <text class="o-no">{{item.orderNo}}</text>
+      <text class="o-status s-{{item.status}}">{{item.status}}</text>
+    </view>
+    <view class="o-body" bindtap="goDetail" data-id="{{item.itemId}}">
+      <image class="o-img" src="{{item.img}}" mode="aspectFill" lazy-load />
+      <view class="o-info">
+        <view class="o-title">{{item.itemTitle}}</view>
+        <view class="o-price price">¥{{item.priceTxt}}</view>
+      </view>
+    </view>
+    <view class="addr" wx:if="{{item.status==='待发货'}}">
+      <view class="addr-title">📍 买家收货信息</view>
+      <view>{{item.buyer}}</view>
+      <view>{{item.address}}</view>
+    </view>
+    <view class="logi" wx:if="{{item.courier && (item.status==='待收货' || item.status==='已完成')}}">
+      🚚 {{item.courier}} {{item.tracking}}
+    </view>
+    <view class="o-actions">
+      <text class="paid" wx:if="{{item.status==='已完成'}}">实收 ¥{{item.incomeTxt}}（佣金 ¥{{item.commissionTxt}}）</text>
+      <button class="btn-primary mini" wx:if="{{item.status==='待发货'}}" data-id="{{item.id}}" bindtap="ship">去发货</button>
+      <button class="ghost-btn mini" wx:if="{{item.status==='已完成'}}" data-id="{{item.id}}" bindtap="review">⭐ 评价买家</button>
+    </view>
+  </view>
+</view>
