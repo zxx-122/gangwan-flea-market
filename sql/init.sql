@@ -140,16 +140,18 @@ CREATE TABLE IF NOT EXISTS `fund_flow` (
     INDEX `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 订单评价表（一单一评）
+-- 订单评价表（一单可互评：B2S 买家评卖家 / S2B 卖家评买家）
 CREATE TABLE IF NOT EXISTS `review` (
     `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
-    `order_id` BIGINT NOT NULL UNIQUE,
+    `order_id` BIGINT NOT NULL,
     `item_id` BIGINT NOT NULL,
     `from_user_id` BIGINT NOT NULL,
     `to_user_id` BIGINT NOT NULL,
     `rating` INT NOT NULL DEFAULT 5 COMMENT '1-5星',
     `content` TEXT DEFAULT NULL,
+    `direction` VARCHAR(4) NOT NULL DEFAULT 'B2S',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_order_dir` (`order_id`, `direction`),
     INDEX `idx_item_id` (`item_id`),
     INDEX `idx_to_user` (`to_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

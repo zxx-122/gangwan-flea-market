@@ -154,7 +154,7 @@ const Home = {
 
             <div class="waterfall" v-if="items.length">
                 <div class="item-card liquid-card" v-for="it in items" :key="it.id" @click="toDetail(it.id)">
-                <img class="item-img" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                <img class="item-img" loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
                 <div class="item-info">
                     <div class="item-title">{{it.title}}</div>
                     <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
@@ -453,7 +453,7 @@ const ItemDetail = {
                 <div class="detail-section-title">看了又看 · 同款推荐</div>
                 <div class="related-list">
                     <div class="item-card liquid-card related-card" v-for="it in relatedList" :key="it.id" @click="$router.push('/item/'+it.id)">
-                        <img class="item-img" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                        <img class="item-img" loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
                         <div class="item-info">
                             <div class="item-title">{{it.title}}</div>
                             <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
@@ -568,12 +568,23 @@ const ItemDetail = {
         function prevImg() { imgIdx.value = (imgIdx.value - 1 + images.value.length) % images.value.length; }
         function nextImg() { imgIdx.value = (imgIdx.value + 1) % images.value.length; }
 
+        // 记录浏览历史（本地存储，最新在前，上限50条）
+        function saveBrowseHistory(d) {
+            try {
+                const key = 'browseHistory';
+                const list = JSON.parse(localStorage.getItem(key) || '[]').filter(x => String(x.id) !== String(d.id));
+                list.unshift({ id: d.id, title: d.title, price: d.price, img: (d.images && d.images[0] && (d.images[0].url || d.images[0])) || null, time: Date.now() });
+                localStorage.setItem(key, JSON.stringify(list.slice(0, 50)));
+            } catch (e) {}
+        }
+
         async function load() {
             loading.value = true;
             try {
                 const res = await itemApi.getById(route.params.id);
                 detail.value = res.data;
                 imgIdx.value = 0;
+                saveBrowseHistory(detail.value);
                 loadRelated();
                 if (isLoggedIn()) {
                     try {
@@ -835,7 +846,7 @@ const MyItems = {
         </div>
         <div v-else>
             <div class="my-item-card liquid-card" v-for="it in items" :key="it.id">
-                <img :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr" @click="$router.push('/item/'+it.id)">
+                <img loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr" @click="$router.push('/item/'+it.id)">
                 <div class="my-item-info">
                     <div>
                         <div class="my-item-title" @click="$router.push('/item/'+it.id)">{{it.title}}</div>
@@ -905,7 +916,7 @@ const Orders = {
                     <span class="order-status" :class="statusClass(o.status)"><i :class="statusIcon(o.status)"></i> {{o.status}}</span>
                 </div>
                 <div class="order-body" @click="$router.push('/item/'+o.itemId)">
-                    <img class="item-img" :src="imgUrl(o.itemImage)" @error="onImgErr">
+                    <img class="item-img" loading="lazy" :src="imgUrl(o.itemImage)" @error="onImgErr">
                     <div class="item-info">
                         <div class="item-title">{{o.itemTitle || '商品已删除'}}</div>
                         <div class="item-price">¥{{fmtPrice(o.price)}}</div>
@@ -923,7 +934,7 @@ const Orders = {
                     <span class="order-no" v-if="o.status==='已完成'">实付 ¥{{fmtPrice(o.price)}}</span>
                     <button class="btn btn-sm btn-ghost" v-if="o.status==='待发货'" @click="cancel(o.id)"><i class="fa fa-times"></i> 取消订单</button>
                     <button class="btn btn-sm btn-primary" v-if="o.status==='待收货'" @click="confirm(o.id)"><i class="fa fa-check"></i> 确认收货</button>
-                    <button class="btn btn-sm btn-outline" v-if="o.status==='已完成'" @click="openReview(o)"><i class="fa fa-star-o"></i> 评价</button>
+                    <button class="btn btn-sm btn-outline" v-if="o.status==='已完成'" @click="openReview(o)"><i class="fa fa-star-o"></i> 评价卖家</button>
                     <button class="btn btn-sm btn-ghost" @click="showDetail(o.id)">详情</button>
                 </div>
             </div>
@@ -1018,7 +1029,8 @@ const Orders = {
         async function openReview(o) {
             try {
                 const res = await reviewApi.byOrder(o.id);
-                if (res.data) { showToast('该订单已评价过'); return; }
+                const mine = (res.data || []).find(r => r.direction === 'B2S');
+                if (mine) { showToast('已评价过卖家'); return; }
             } catch (e) {}
             reviewForm.orderId = o.id;
             reviewForm.rating = 5;
@@ -1079,7 +1091,7 @@ const Sales = {
                     <span class="order-status" :class="statusClass(o.status)"><i :class="statusIcon(o.status)"></i> {{o.status}}</span>
                 </div>
                 <div class="order-body" @click="$router.push('/item/'+o.itemId)">
-                    <img class="item-img" :src="imgUrl(o.itemImage)" @error="onImgErr">
+                    <img class="item-img" loading="lazy" :src="imgUrl(o.itemImage)" @error="onImgErr">
                     <div class="item-info">
                         <div class="item-title">{{o.itemTitle}}</div>
                         <div class="item-price">¥{{fmtPrice(o.price)}}</div>
@@ -1101,6 +1113,29 @@ const Sales = {
                 <div class="order-footer" style="margin-top:12px;">
                     <span class="order-no" v-if="o.status==='已完成'">实收 ¥{{fmtPrice(o.sellerIncome)}}（佣金 ¥{{fmtPrice(o.commission)}}）</span>
                     <button class="btn btn-sm btn-primary" v-if="o.status==='待发货'" @click="ship(o.id)"><i class="fa fa-truck"></i> 去发货</button>
+                    <button class="btn btn-sm btn-outline" v-if="o.status==='已完成'" @click="openReview(o)"><i class="fa fa-star-o"></i> 评价买家</button>
+                </div>
+            </div>
+        </div>
+        <!-- 评价买家弹窗 -->
+        <div class="modal-overlay" v-if="showReview" @click.self="showReview=false">
+            <div class="modal-box" style="max-width:360px;">
+                <div class="ship-head">
+                    <div class="ship-icon" style="background:linear-gradient(135deg,#FF9A44,#FFC371);"><i class="fa fa-star"></i></div>
+                    <h3>评价这位买家</h3>
+                    <p>买家的沟通与付款体验</p>
+                </div>
+                <div style="text-align:center;margin-bottom:14px;">
+                    <i v-for="n in 5" :key="n" class="fa review-star-pick" :class="n <= reviewForm.rating ? 'fa-star' : 'fa-star-o'"
+                       @click="reviewForm.rating = n"
+                       :style="{color: n <= reviewForm.rating ? '#FFB800' : '#ddd', fontSize: '30px', margin: '0 6px', cursor: 'pointer'}"></i>
+                    <div style="font-size:12px;color:#999;margin-top:4px;">{{['', '很差', '较差', '一般', '满意', '超赞'][reviewForm.rating]}}</div>
+                </div>
+                <textarea v-model="reviewForm.content" placeholder="买家的沟通、下单体验如何…（选填）"
+                          style="width:100%;box-sizing:border-box;min-height:80px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;font-size:13px;outline:none;resize:none;"></textarea>
+                <div class="modal-actions" style="margin-top:14px;">
+                    <button class="btn btn-ghost" @click="showReview=false">取消</button>
+                    <button class="btn btn-primary" @click="submitReview"><i class="fa fa-star"></i> 提交评价</button>
                 </div>
             </div>
         </div>
@@ -1108,6 +1143,28 @@ const Sales = {
     setup() {
         const orders = ref([]);
         const loading = ref(true);
+        // 评价买家
+        const showReview = ref(false);
+        const reviewForm = reactive({ orderId: null, rating: 5, content: '' });
+        async function openReview(o) {
+            try {
+                const res = await reviewApi.byOrder(o.id);
+                const mine = (res.data || []).find(r => r.direction === 'S2B');
+                if (mine) { showToast('已评价过买家'); return; }
+            } catch (e) {}
+            reviewForm.orderId = o.id;
+            reviewForm.rating = 5;
+            reviewForm.content = '';
+            showReview.value = true;
+        }
+        async function submitReview() {
+            try {
+                await reviewApi.create({ orderId: reviewForm.orderId, rating: reviewForm.rating, content: reviewForm.content });
+                showToast('评价成功');
+                showReview.value = false;
+                load();
+            } catch (e) { showToast(e.message); }
+        }
         async function load() {
             loading.value = true;
             try {
@@ -1174,7 +1231,7 @@ const Sales = {
             return { '待发货': 'fa fa-clock-o', '待收货': 'fa fa-truck', '已完成': 'fa fa-check-circle', '已取消': 'fa fa-times-circle' }[s] || '';
         }
         onMounted(load);
-        return { orders, loading, ship, statusClass, statusIcon, copyText, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
+        return { orders, loading, ship, statusClass, statusIcon, copyText, showReview, reviewForm, openReview, submitReview, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
     }
 };
 
@@ -1237,7 +1294,7 @@ const Chat = {
             <div class="navbar-title">{{other.nickname || other.username || '聊天'}}</div>
             <div class="navbar-right"></div>
         </div>
-        <div class="chat-messages" ref="msgBox">
+        <div class="chat-messages" ref="msgBox" @scroll="onMsgScroll">
             <div v-for="m in messages" :key="m.id" style="display:flex;flex-direction:column;">
                 <div class="chat-msg" :class="m.fromUserId===myId ? 'chat-msg-self' : 'chat-msg-other'">{{m.content}}</div>
             </div>
@@ -1272,16 +1329,21 @@ const Chat = {
         ];
         const myId = computed(() => store.user && store.user.id);
         let timer = null;
+        const lastScrollByUser = ref(false);
 
         function useQuick(q) { text.value = q; }
 
         async function load() {
             try {
                 const res = await messageApi.getChat({ otherUserId, itemId });
+                const prevCount = messages.value.length;
                 messages.value = res.data || [];
                 // 标记已读
                 messageApi.markRead({ otherUserId }).then(() => store.refreshUnread()).catch(() => {});
-                scrollToBottom();
+                // 自己发消息或首次加载直接到底；轮询新消息时仅当用户正贴近底部才跟随滚动
+                if (prevCount === 0 || messages.value.length !== prevCount) {
+                    if (prevCount === 0 || isNearBottom() || messages.value.length > prevCount && lastScrollByUser.value === false) scrollToBottom();
+                }
                 // 对方信息
                 if (!other.username) {
                     try {
@@ -1298,15 +1360,25 @@ const Chat = {
             try {
                 await messageApi.send({ toUserId: otherUserId, content: text.value, itemId });
                 text.value = '';
+                lastScrollByUser.value = false;
                 load();
+                scrollToBottom();
             } catch (e) { showToast(e.message); }
         }
         function scrollToBottom() {
             nextTick(() => { if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight; });
         }
-        onMounted(() => { load(); timer = setInterval(load, 5000); });
+        function isNearBottom() {
+            if (!msgBox.value) return true;
+            return msgBox.value.scrollHeight - msgBox.value.scrollTop - msgBox.value.clientHeight < 80;
+        }
+        function onMsgScroll() {
+            // 用户向上翻看历史时，暂停自动跟随
+            lastScrollByUser.value = !isNearBottom();
+        }
+        onMounted(() => { load(); timer = setInterval(load, 3000); });
         onUnmounted(() => { if (timer) clearInterval(timer); });
-        return { messages, other, text, send, msgBox, myId, quickPhrases, useQuick };
+        return { messages, other, text, send, msgBox, myId, quickPhrases, useQuick, onMsgScroll };
     }
 };
 
@@ -1326,7 +1398,7 @@ const Favorites = {
         </div>
         <div v-else>
             <div class="fav-item liquid-card" v-for="it in list" :key="it.id">
-                <img :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr" @click="$router.push('/item/'+it.id)">
+                <img loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr" @click="$router.push('/item/'+it.id)">
                 <div class="fav-info" @click="$router.push('/item/'+it.id)">
                     <div class="fav-title">{{it.title}}</div>
                     <div class="fav-bottom">
@@ -1389,6 +1461,7 @@ const Profile = {
             <div class="profile-menu-item" @click="go('/orders')"><span class="profile-menu-icon"><i class="fa fa-reorder"></i></span><span class="profile-menu-text">我买到的</span><span class="profile-menu-arrow">›</span></div>
             <div class="profile-menu-item" @click="go('/sales')"><span class="profile-menu-icon"><i class="fa fa-money"></i></span><span class="profile-menu-text">我卖出的</span><span class="profile-menu-arrow">›</span></div>
             <div class="profile-menu-item" @click="go('/favorites')"><span class="profile-menu-icon"><i class="fa fa-heart"></i></span><span class="profile-menu-text">我的收藏</span><span class="profile-menu-arrow">›</span></div>
+            <div class="profile-menu-item" @click="go('/history')"><span class="profile-menu-icon"><i class="fa fa-history"></i></span><span class="profile-menu-text">浏览历史</span><span class="profile-menu-arrow">›</span></div>
             <div class="profile-menu-item" @click="editProfile"><span class="profile-menu-icon"><i class="fa fa-cog"></i></span><span class="profile-menu-text">修改资料</span><span class="profile-menu-arrow">›</span></div>
             <div class="profile-menu-item" @click="changePwd"><span class="profile-menu-icon"><i class="fa fa-lock"></i></span><span class="profile-menu-text">修改密码</span><span class="profile-menu-arrow">›</span></div>
             <div class="profile-menu-item" v-if="store.user.role==='ADMIN'" @click="toAdmin"><span class="profile-menu-icon"><i class="fa fa-shield"></i></span><span class="profile-menu-text">管理后台</span><span class="profile-menu-arrow">›</span></div>
@@ -1625,6 +1698,56 @@ const Wallet = {
     }
 };
 
+// ===================== 浏览历史 =====================
+const History = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.push('/profile')"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">浏览历史</div>
+            <div class="navbar-right"><span style="font-size:12px;color:#999;cursor:pointer;" @click="clearAll" v-if="list.length">清空</span></div>
+        </div>
+        <div v-if="!list.length" class="empty-state">
+            <div class="icon"><i class="fa fa-history"></i></div>
+            <div class="text">还没有浏览记录</div>
+            <div class="sub">去首页逛逛，看过的宝贝会出现在这里</div>
+        </div>
+        <div v-else style="padding-bottom:20px;">
+            <div class="card liquid-card" v-for="it in list" :key="it.id" style="margin:12px 16px 0;padding:12px 14px;display:flex;gap:12px;align-items:center;cursor:pointer;" @click="$router.push('/item/'+it.id)">
+                <img loading="lazy" :src="imgUrl(it.img)" @error="onImgErr" style="width:64px;height:64px;border-radius:10px;object-fit:cover;background:#f5f5f5;flex-shrink:0;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{it.title}}</div>
+                    <div style="font-size:15px;font-weight:700;color:#FF6B35;margin-top:4px;">¥{{fmtPrice(it.price)}}</div>
+                    <div style="font-size:11px;color:#bbb;margin-top:4px;">浏览于 {{fmtTime(it.time)}}</div>
+                </div>
+                <i class="fa fa-angle-right" style="color:#ccc;"></i>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const list = ref([]);
+        function load() {
+            try { list.value = JSON.parse(localStorage.getItem('browseHistory') || '[]'); } catch (e) { list.value = []; }
+        }
+        async function clearAll() {
+            if (!await showModal('清空浏览历史', '确定清空全部浏览记录吗？')) return;
+            localStorage.removeItem('browseHistory');
+            list.value = [];
+            showToast('已清空');
+        }
+        function fmtTime(ts) {
+            const d = new Date(ts);
+            const now = new Date();
+            const sameDay = d.toDateString() === now.toDateString();
+            const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+            if (sameDay) return '今天 ' + hm;
+            return (d.getMonth() + 1) + '-' + d.getDate() + ' ' + hm;
+        }
+        onMounted(load);
+        return { list, clearAll, fmtTime, imgUrl: getImageUrl, fmtPrice, onImgErr };
+    }
+};
+
 // ===================== 路由守卫 & 工具 =====================
 function requireLogin(router) {
     if (!isLoggedIn()) {
@@ -1649,6 +1772,7 @@ const routes = [
     { path: '/chat/:userId', component: Chat, meta: { requireAuth: true } },
     { path: '/chat/:userId/:itemId', component: Chat, meta: { requireAuth: true } },
     { path: '/favorites', component: Favorites, meta: { requireAuth: true } },
+    { path: '/history', component: History },
     { path: '/wallet', component: Wallet, meta: { requireAuth: true } },
     { path: '/profile', component: Profile, meta: { tab: 'profile' } },
     { path: '/login', component: {

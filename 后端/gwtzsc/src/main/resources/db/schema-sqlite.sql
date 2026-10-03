@@ -122,16 +122,18 @@ CREATE TABLE IF NOT EXISTS fund_flow (
 CREATE INDEX IF NOT EXISTS idx_fund_flow_user_id ON fund_flow(user_id);
 CREATE INDEX IF NOT EXISTS idx_fund_flow_created_at ON fund_flow(created_at);
 
--- 订单评价表（一单一评）
+-- 订单评价表（一单可互评：B2S 买家评卖家 / S2B 卖家评买家）
 CREATE TABLE IF NOT EXISTS review (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id INTEGER NOT NULL UNIQUE,
+    order_id INTEGER NOT NULL,
     item_id INTEGER NOT NULL,
     from_user_id INTEGER NOT NULL,
     to_user_id INTEGER NOT NULL,
     rating INTEGER NOT NULL DEFAULT 5,
     content TEXT DEFAULT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    direction TEXT NOT NULL DEFAULT 'B2S',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(order_id, direction)
 );
 
 CREATE INDEX IF NOT EXISTS idx_review_item_id ON review(item_id);

@@ -19,6 +19,8 @@ public class Review {
     /** 1-5 星 */
     private Integer rating;
     private String content;
+    /** 评价方向：B2S 买家评卖家 / S2B 卖家评买家 */
+    private String direction;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

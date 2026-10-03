@@ -23,7 +23,7 @@ public class ReviewController {
     @Autowired private OrderMapper orderMapper;
     @Autowired private UserMapper userMapper;
 
-    /** 买家对已完成订单评价（一单一评） */
+    /** 交易双方对已完成订单互评（买家评卖家 B2S / 卖家评买家 S2B，一单一方向一评） */
     @PostMapping
     public Result<?> create(HttpServletRequest request, @RequestBody Map<String, Object> body) {
         Long userId = (Long) request.getAttribute("userId");
@@ -37,35 +37,50 @@ public class ReviewController {
         Order order = orderMapper.selectById(orderId);
         if (order == null) return Result.error("订单不存在");
         if (!"已完成".equals(order.getStatus())) return Result.error("仅已完成订单可评价");
-        if (!order.getBuyerId().equals(userId)) return Result.error("仅买家可评价");
 
-        Long count = reviewMapper.selectCount(new LambdaQueryWrapper<Review>().eq(Review::getOrderId, orderId));
+        String direction;
+        Long toUser;
+        if (order.getBuyerId().equals(userId)) {
+            direction = "B2S";
+            toUser = order.getSellerId();
+        } else if (order.getSellerId().equals(userId)) {
+            direction = "S2B";
+            toUser = order.getBuyerId();
+        } else {
+            return Result.error("仅交易双方可评价");
+        }
+
+        Long count = reviewMapper.selectCount(new LambdaQueryWrapper<Review>()
+                .eq(Review::getOrderId, orderId)
+                .eq(Review::getDirection, direction));
         if (count > 0) return Result.error("该订单已评价过");
 
         Review review = new Review();
         review.setOrderId(orderId);
         review.setItemId(order.getItemId());
         review.setFromUserId(userId);
-        review.setToUserId(order.getSellerId());
+        review.setToUserId(toUser);
         review.setRating(rating);
         review.setContent(content);
+        review.setDirection(direction);
         reviewMapper.insert(review);
         return Result.success();
     }
 
-    /** 某订单的评价（用于判断是否已评） */
+    /** 某订单的评价列表（交易双方查看自己是否已评） */
     @GetMapping("/order/{orderId}")
     public Result<?> byOrder(@PathVariable Long orderId) {
-        Review review = reviewMapper.selectOne(new LambdaQueryWrapper<Review>().eq(Review::getOrderId, orderId));
-        return Result.success(review);
+        List<Review> list = reviewMapper.selectList(new LambdaQueryWrapper<Review>().eq(Review::getOrderId, orderId));
+        return Result.success(list);
     }
 
-    /** 商品的评价列表（公开） */
+    /** 商品的评价列表（买家写的，公开） */
     @GetMapping("/item/{itemId}")
     public Result<?> byItem(@PathVariable Long itemId) {
         return Result.success(buildList(
                 reviewMapper.selectList(new LambdaQueryWrapper<Review>()
                         .eq(Review::getItemId, itemId)
+                        .eq(Review::getDirection, "B2S")
                         .orderByDesc(Review::getCreatedAt))));
     }
 

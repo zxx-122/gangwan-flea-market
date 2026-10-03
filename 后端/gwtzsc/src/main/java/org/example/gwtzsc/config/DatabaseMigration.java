@@ -120,39 +120,64 @@ public class DatabaseMigration implements CommandLineRunner {
         }
     }
 
-    /** 订单评价表（一单一评，幂等创建） */
+    /** 订单评价表（一单可互评：买家评卖家 B2S / 卖家评买家 S2B；幂等创建+升级） */
     private void migrateReviewTable(boolean sqlite) {
-        String ddl;
-        if (sqlite) {
-            ddl = "CREATE TABLE IF NOT EXISTS review ("
-                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                    + "order_id INTEGER NOT NULL UNIQUE, "
-                    + "item_id INTEGER NOT NULL, "
-                    + "from_user_id INTEGER NOT NULL, "
-                    + "to_user_id INTEGER NOT NULL, "
-                    + "rating INTEGER NOT NULL DEFAULT 5, "
-                    + "content TEXT DEFAULT NULL, "
-                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)";
-        } else {
-            ddl = "CREATE TABLE IF NOT EXISTS review ("
-                    + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
-                    + "order_id BIGINT NOT NULL UNIQUE, "
-                    + "item_id BIGINT NOT NULL, "
-                    + "from_user_id BIGINT NOT NULL, "
-                    + "to_user_id BIGINT NOT NULL, "
-                    + "rating INT NOT NULL DEFAULT 5, "
-                    + "content TEXT, "
-                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
-                    + "INDEX idx_item_id (item_id), "
-                    + "INDEX idx_to_user (to_user_id)"
-                    + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        // 旧表（无 direction 列、order_id 单列 UNIQUE）需要重建为支持互评的结构
+        List<String> cols = existingColumns("review");
+        if (!cols.isEmpty() && !cols.contains("direction")) {
+            try {
+                jdbcTemplate.execute("ALTER TABLE review RENAME TO review_old");
+                String ddlNew = sqlite ? reviewDdlSqlite() : reviewDdlMysql();
+                jdbcTemplate.execute(ddlNew);
+                jdbcTemplate.execute("INSERT INTO review (id, order_id, item_id, from_user_id, to_user_id, rating, content, created_at, direction) "
+                        + "SELECT id, order_id, item_id, from_user_id, to_user_id, rating, content, created_at, 'B2S' FROM review_old");
+                jdbcTemplate.execute("DROP TABLE review_old");
+                log.info("[DatabaseMigration] review 表已升级为支持互评（direction）");
+            } catch (Exception e) {
+                log.warn("[DatabaseMigration] review 表升级失败：{}", e.getMessage());
+                // 升级失败时确保新表存在（忽略已存在错误）
+                try { jdbcTemplate.execute(sqlite ? reviewDdlSqlite() : reviewDdlMysql()); } catch (Exception ignored) {}
+            }
+            return;
         }
+        String ddl = sqlite ? reviewDdlSqlite() : reviewDdlMysql();
         try {
             jdbcTemplate.execute(ddl);
             log.info("[DatabaseMigration] review 表结构校验完成");
         } catch (Exception e) {
             log.warn("[DatabaseMigration] 创建 review 表失败：{}", e.getMessage());
         }
+    }
+
+    private String reviewDdlSqlite() {
+        return "CREATE TABLE IF NOT EXISTS review ("
+                + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + "order_id INTEGER NOT NULL, "
+                + "item_id INTEGER NOT NULL, "
+                + "from_user_id INTEGER NOT NULL, "
+                + "to_user_id INTEGER NOT NULL, "
+                + "rating INTEGER NOT NULL DEFAULT 5, "
+                + "content TEXT DEFAULT NULL, "
+                + "direction TEXT NOT NULL DEFAULT 'B2S', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "UNIQUE(order_id, direction))";
+    }
+
+    private String reviewDdlMysql() {
+        return "CREATE TABLE IF NOT EXISTS review ("
+                + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                + "order_id BIGINT NOT NULL, "
+                + "item_id BIGINT NOT NULL, "
+                + "from_user_id BIGINT NOT NULL, "
+                + "to_user_id BIGINT NOT NULL, "
+                + "rating INT NOT NULL DEFAULT 5, "
+                + "content TEXT, "
+                + "direction VARCHAR(4) NOT NULL DEFAULT 'B2S', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "UNIQUE KEY uk_order_dir (order_id, direction), "
+                + "INDEX idx_item_id (item_id), "
+                + "INDEX idx_to_user (to_user_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
     }
 
     /** 公告表（幂等创建） */
