@@ -389,9 +389,13 @@ public class ItemServiceImpl implements ItemService {
     }
 
     private List<Map<String, Object>> buildItemList(List<Item> items) {
-        // 一次性批量查出所有图片，避免逐商品查询（N+1）
+        // 一次性批量查出所有图片与卖家信息，避免逐商品查询（N+1）
         Map<Long, List<String>> imagesByItem = itemImageService.getImagesByItemIds(
                 items.stream().map(Item::getId).collect(Collectors.toList()));
+        Set<Long> sellerIds = items.stream().map(Item::getUserId).collect(Collectors.toSet());
+        Map<Long, User> sellersById = sellerIds.isEmpty() ? Collections.emptyMap()
+                : userMapper.selectBatchIds(sellerIds).stream()
+                    .collect(Collectors.toMap(User::getId, u -> u));
         return items.stream().map(item -> {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("id", item.getId());
@@ -412,6 +416,12 @@ public class ItemServiceImpl implements ItemService {
             List<String> images = imagesByItem.getOrDefault(item.getId(), Collections.emptyList());
             map.put("images", images);
             map.put("mainImage", images.isEmpty() ? null : images.get(0));
+            User seller = sellersById.get(item.getUserId());
+            Map<String, Object> sellerInfo = new LinkedHashMap<>();
+            sellerInfo.put("id", item.getUserId());
+            sellerInfo.put("nickname", seller != null ? seller.getNickname() : null);
+            sellerInfo.put("avatar", seller != null ? seller.getAvatar() : null);
+            map.put("seller", sellerInfo);
             return map;
         }).collect(Collectors.toList());
     }

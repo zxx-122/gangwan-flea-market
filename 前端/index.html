@@ -147,6 +147,10 @@ const Home = {
             <div class="sort-chip" :class="{active: activeSort==='price_asc'}" @click="setSort('price_asc')">价格↑</div>
             <div class="sort-chip" :class="{active: activeSort==='price_desc'}" @click="setSort('price_desc')">价格↓</div>
         </div>
+        <div class="fav-tags" v-if="hotWords.length">
+            <span class="fav-tags-label"><i class="fa fa-fire"></i> 猜你喜欢</span>
+            <span class="fav-tag" v-for="(w,i) in hotWords" :key="w" @click="searchWord(w)"><b>{{i+1}}</b>{{w}}</span>
+        </div>
         <div class="sort-toolbar" style="margin-top:-6px;">
             <div class="sort-chip" :class="{active: activeCat===null}" @click="filterCategory(null)">全部</div>
             <div class="sort-chip" :class="{active: activeCat===c.id}" v-for="c in store.categories" :key="c.id" @click="filterCategory(c.id)">{{c.name}}</div>
@@ -154,13 +158,24 @@ const Home = {
 
             <div class="waterfall" v-if="items.length">
                 <div class="item-card liquid-card" v-for="it in items" :key="it.id" @click="toDetail(it.id)">
-                <img class="item-img" loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                <div class="item-img-wrap">
+                    <img class="item-img" loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                    <span class="corner-tag free" v-if="parseFloat(it.price)===0">免费送</span>
+                    <span class="corner-tag ship" v-else-if="it.isFreeShip===1">包邮</span>
+                    <span class="corner-tag orig" v-else-if="it.isOriginal===1">实拍</span>
+                </div>
                 <div class="item-info">
                     <div class="item-title">{{it.title}}</div>
-                    <div class="item-price"><span class="unit">¥</span>{{fmtPrice(it.price)}}</div>
+                    <div class="item-price">
+                        <span v-if="parseFloat(it.price)===0" class="free-label">免费送</span>
+                        <template v-else><span class="unit">¥</span>{{fmtPrice(it.price)}}</template>
+                        <span class="item-cond" v-if="it.condition">{{it.condition}}</span>
+                    </div>
                     <div class="item-extra">
-                        <span><i class="fa fa-user-o"></i> {{it.views||0}}浏览</span>
-                        <span>{{shortTime(it.createdAt)}}</span>
+                        <img class="seller-avatar" v-if="it.seller && it.seller.avatar" :src="imgUrl(it.seller.avatar)">
+                        <i class="fa fa-user-circle seller-avatar-ph" v-else></i>
+                        <span class="seller-name">{{it.seller ? (it.seller.nickname || '同学') : '同学'}}</span>
+                        <span class="item-views">{{it.views||0}}浏览</span>
                     </div>
                 </div>
             </div>
@@ -169,6 +184,16 @@ const Home = {
         <div class="load-more" v-if="items.length && !noMore">
             <span class="scroll-spinner" v-if="loading"></span>
             {{loading ? '加载中...' : '上拉加载更多'}}
+        </div>
+        <div class="waterfall" v-if="loading && !items.length">
+            <div class="item-card skeleton-card" v-for="n in 6" :key="'sk'+n">
+                <div class="sk-img"></div>
+                <div class="item-info">
+                    <div class="sk-line"></div>
+                    <div class="sk-line short"></div>
+                    <div class="sk-line tiny"></div>
+                </div>
+            </div>
         </div>
         <div class="empty-state" v-if="!loading && !items.length">
             <div class="icon"><i class="fa fa-inbox"></i></div>
@@ -182,6 +207,14 @@ const Home = {
                 <i class="fa fa-arrow-left navbar-back" @click="searchOpen=false"></i>
                 <input v-model="keyword" placeholder="搜索商品关键词" @keyup.enter="doSearch" ref="searchInput">
                 <span class="cancel-btn" @click="doSearch">搜索</span>
+            </div>
+            <div class="search-history" v-if="!searched && searchHistory.length">
+                <div class="search-hot-title"><i class="fa fa-history"></i> 最近搜索
+                    <span class="clear-history" @click="clearSearchHistory"><i class="fa fa-trash-o"></i> 清空</span>
+                </div>
+                <div class="search-hot-words">
+                    <span class="hot-word" v-for="w in searchHistory" :key="'h'+w" @click="keyword=w; doSearch()">{{w}}</span>
+                </div>
             </div>
             <div class="search-hot" v-if="!searched">
                 <div class="search-hot-title"><i class="fa fa-fire"></i> 大家都在搜</div>
@@ -219,10 +252,12 @@ const Home = {
                 </div>
             </div>
         </div>
+        <div class="backtop" v-if="showBackTop" @click="backTop"><i class="fa fa-arrow-up"></i></div>
     </div>`,
     setup() {
         const router = useRouter();
         const items = ref([]);
+        const showBackTop = ref(false);
         const loading = ref(false);
         const page = ref(1);
         const size = 10;
@@ -287,6 +322,7 @@ const Home = {
                 searchResults.value = reset ? list : searchResults.value.concat(list);
                 searchTotal.value = pr.total || 0;
                 searched.value = true;
+                if (reset && searchResults.value.length) pushSearchHistory(keyword.value.trim());
             } catch (e) { showToast(e.message); }
             searchLoading.value = false;
         }
@@ -334,8 +370,9 @@ const Home = {
         }
 
         function onScroll() {
-            if (searchOpen.value) { searchScroll(); return; }
             const st = document.documentElement.scrollTop || document.body.scrollTop;
+            showBackTop.value = st > 600;
+            if (searchOpen.value) { searchScroll(); return; }
             const sh = document.documentElement.scrollHeight;
             if (sh - st - window.innerHeight < 100 && !noMore.value && !loading.value) {
                 page.value++; load(false);
@@ -354,6 +391,27 @@ const Home = {
             if (v) { searched.value = false; nextTick(() => searchInput.value && searchInput.value.focus()); }
         });
 
+        // 搜索历史（本地，最新在前，上限10条）
+        const searchHistory = ref(JSON.parse(localStorage.getItem('searchHistory') || '[]'));
+        function pushSearchHistory(kw) {
+            const arr = searchHistory.value.filter(x => x !== kw);
+            arr.unshift(kw);
+            searchHistory.value = arr.slice(0, 10);
+            localStorage.setItem('searchHistory', JSON.stringify(searchHistory.value));
+        }
+        function clearSearchHistory() {
+            searchHistory.value = [];
+            localStorage.removeItem('searchHistory');
+        }
+        // 猜你喜欢：点击热词直接搜索
+        function searchWord(w) {
+            keyword.value = w;
+            searchOpen.value = true;
+            doSearch();
+        }
+        // 回到顶部
+        function backTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
         // 平台公告横幅
         const noticeOpen = ref(false);
         const noticeReadId = ref(localStorage.getItem('noticeRead'));
@@ -369,6 +427,8 @@ const Home = {
             store, items, loading, noMore, activeCat, activeSort, setSort,
             searchOpen, keyword, searchResults, searched, searchInput, hotWords, suggestWords,
             searchLoading, searchNoMore, searchScroll, doSearch,
+            searchHistory, pushSearchHistory, clearSearchHistory, searchWord,
+            showBackTop, backTop,
             noticeOpen, noticeClosed, closeNotice,
             filterCategory, doSearch, toDetail, toProfile,
             pullDist, refreshing, onTouchStart, onTouchMove, onTouchEnd,
