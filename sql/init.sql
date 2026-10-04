@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS `user` (
     `nickname` VARCHAR(50) DEFAULT NULL,
     `avatar` VARCHAR(255) DEFAULT NULL,
     `phone` VARCHAR(20) DEFAULT NULL,
+    `wx_openid` VARCHAR(64) DEFAULT NULL COMMENT '微信小程序openid',
+    UNIQUE KEY `uk_wx_openid` (`wx_openid`),
     `role` VARCHAR(20) NOT NULL DEFAULT 'USER' COMMENT 'USER/ADMIN',
     `balance` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     `status` INT NOT NULL DEFAULT 1 COMMENT '1正常/0禁用',

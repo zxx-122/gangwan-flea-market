@@ -133,7 +133,8 @@ public class UserServiceImpl implements UserService {
         return buildLoginResult(user);
     }
 
-    private Map<String, Object> buildLoginResult(User user) {
+    @Override
+    public Map<String, Object> buildLoginResult(User user) {
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);

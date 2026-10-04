@@ -34,6 +34,7 @@ public class DatabaseMigration implements CommandLineRunner {
         migrateOrderColumns(sqlite);
         migrateItemColumns(sqlite);
         migrateFundFlowTable(sqlite);
+        migrateUserWxOpenid(sqlite);
         migrateReviewTable(sqlite);
         migrateAnnouncementTable(sqlite);
         log.info("[DatabaseMigration] 数据库结构校验完成（sqlite={}）", sqlite);
@@ -92,6 +93,25 @@ public class DatabaseMigration implements CommandLineRunner {
             } catch (Exception e) {
                 log.warn("[DatabaseMigration] 新增字段 {} 失败：{}", name, e.getMessage());
             }
+        }
+    }
+
+    /** user 表补微信 openid 列（幂等） */
+    private void migrateUserWxOpenid(boolean sqlite) {
+        List<String> cols = existingColumns("user");
+        if (cols.isEmpty() && sqlite) {
+            cols = sqliteColumns("user");
+        }
+        if (cols.contains("wx_openid")) return;
+        try {
+            String type = sqlite ? "TEXT DEFAULT NULL" : "VARCHAR(64) DEFAULT NULL";
+            jdbcTemplate.execute("ALTER TABLE `user` ADD COLUMN wx_openid " + type);
+            try {
+                jdbcTemplate.execute("CREATE UNIQUE INDEX uk_wx_openid ON `user` (wx_openid)");
+            } catch (Exception ignored) {}
+            log.info("[DatabaseMigration] 已为 user 表新增字段：wx_openid");
+        } catch (Exception e) {
+            log.warn("[DatabaseMigration] 新增 wx_openid 失败：{}", e.getMessage());
         }
     }
 

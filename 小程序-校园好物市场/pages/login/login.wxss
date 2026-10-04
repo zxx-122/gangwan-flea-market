@@ -11,3 +11,10 @@
 .field input { background: #f8f8f8; border-radius: 16rpx; padding: 22rpx 24rpx; font-size: 28rpx; }
 .submit { margin-top: 40rpx; }
 .hint { text-align: center; font-size: 22rpx; color: #bbb; margin-top: 24rpx; }
+
+.divider { display: flex; align-items: center; margin: 30rpx 0; }
+.divider text { flex: 1; text-align: center; font-size: 22rpx; color: #ccc; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1rpx; background: #eee; }
+.divider text { margin: 0 16rpx; flex: none; }
+.wx-btn { background: #07C160; color: #fff; border-radius: 44rpx; font-weight: 600; }
+.wx-btn::after { border: none; }

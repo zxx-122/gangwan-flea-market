@@ -18,6 +18,8 @@
       <input placeholder="昵称（选填）" value="{{nickname}}" data-field="nickname" bindinput="onInput" maxlength="20" />
     </view>
     <button class="btn-primary submit" loading="{{submitting}}" bindtap="submit">{{mode==='login' ? '登 录' : '注 册'}}</button>
+    <view class="divider"><text>或</text></view>
+    <button class="wx-btn" loading="{{wxing}}" bindtap="wxLogin">微信一键登录</button>
     <view class="hint">注册即送 1000 体验金 · 与网页版账号互通</view>
   </view>
 </view>

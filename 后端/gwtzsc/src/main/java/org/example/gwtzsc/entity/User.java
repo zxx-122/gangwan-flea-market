@@ -15,6 +15,8 @@ public class User {
     private String nickname;
     private String avatar;
     private String phone;
+    /** 微信小程序 openid（一键登录用） */
+    private String wxOpenid;
     private String role;
     private BigDecimal balance;
     private Integer status;

@@ -2,6 +2,7 @@ const api = require('../../utils/api');
 
 Page({
   data: {
+    wxing: false,
     mode: 'login',       // login | register
     username: '',
     password: '',
@@ -15,6 +16,24 @@ Page({
     const f = {};
     f[e.currentTarget.dataset.field] = e.detail.value;
     this.setData(f);
+  },
+  // 微信一键登录：wx.login 拿 code → 后端换 openid 签发 JWT
+  wxLogin() {
+    if (this.data.wxing) return;
+    this.setData({ wxing: true });
+    wx.login({
+      success: (r) => {
+        if (!r.code) { this.setData({ wxing: false }); return wx.showToast({ title: '微信登录失败', icon: 'none' }); }
+        api.post('/auth/wx-login', { code: r.code }).then(res => {
+          const data = res.data || {};
+          wx.setStorageSync('token', data.token);
+          wx.setStorageSync('user', data.user || {});
+          wx.showToast({ title: data.isNewUser ? '登录成功，已送1000体验金' : '登录成功', icon: 'none' });
+          setTimeout(() => wx.switchTab({ url: '/pages/index/index' }), 800);
+        }).catch(() => {}).then(() => this.setData({ wxing: false }));
+      },
+      fail: () => { this.setData({ wxing: false }); wx.showToast({ title: '微信登录失败', icon: 'none' }); }
+    });
   },
   submit() {
     const d = this.data;

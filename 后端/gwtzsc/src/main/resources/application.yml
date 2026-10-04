@@ -29,3 +29,8 @@ jwt:
 
 upload:
   path: "D:/港湾跳蚤市场/uploads"
+
+# 微信小程序配置（正式使用时在服务器 /opt/gwtzsc/conf/application.yml 覆盖）
+wx:
+  appid: ""
+  secret: ""

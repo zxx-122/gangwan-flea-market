@@ -69,7 +69,8 @@ public class JwtInterceptor implements HandlerInterceptor {
     }
 
     private boolean isPublicUri(String method, String uri) {
-        if ("/api/auth/login".equals(uri) || "/api/auth/register".equals(uri) || "/api/auth/send-sms".equals(uri)) {
+        if ("/api/auth/login".equals(uri) || "/api/auth/register".equals(uri) || "/api/auth/send-sms".equals(uri)
+                || "/api/auth/wx-login".equals(uri)) {
             return true;
         }
         if ("/api/category/list".equals(uri)) {
