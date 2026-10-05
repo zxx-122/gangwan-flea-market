@@ -179,3 +179,17 @@ CREATE TABLE IF NOT EXISTS `report` (
     INDEX `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
+-- 求购表
+CREATE TABLE IF NOT EXISTS `want` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `user_id` BIGINT NOT NULL,
+    `title` VARCHAR(100) NOT NULL,
+    `description` TEXT DEFAULT NULL,
+    `price_max` DECIMAL(10,2) DEFAULT NULL COMMENT '期望价格上限',
+    `category_id` INT DEFAULT NULL,
+    `status` VARCHAR(10) NOT NULL DEFAULT '求购中' COMMENT '求购中/已成交/已下架',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_status` (`status`),
+    INDEX `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

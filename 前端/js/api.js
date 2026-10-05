@@ -79,6 +79,14 @@ const reviewApi = {
     userSummary(userId) { return api.get('/review/user/' + userId + '/summary'); }
 };
 
+// ===================== 求购接口 =====================
+const wantApi = {
+    list(params) { return api.get('/want/list', { params }); },
+    mine() { return api.get('/want/mine'); },
+    create(data) { return api.post('/want', data); },
+    setStatus(id, status) { return api.put('/want/' + id + '/status', { status }); }
+};
+
 // ===================== 举报接口 =====================
 const reportApi = {
     create(data) { return api.post('/report', data); },

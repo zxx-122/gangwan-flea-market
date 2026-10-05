@@ -161,3 +161,17 @@ CREATE TABLE IF NOT EXISTS report (
 );
 CREATE INDEX IF NOT EXISTS idx_report_status ON report(status);
 
+
+-- 求购表
+CREATE TABLE IF NOT EXISTS want (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT NULL,
+    price_max REAL DEFAULT NULL,
+    category_id INTEGER DEFAULT NULL,
+    status TEXT NOT NULL DEFAULT '求购中',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_want_status ON want(status);
+CREATE INDEX IF NOT EXISTS idx_want_user ON want(user_id);

@@ -35,6 +35,7 @@ public class DatabaseMigration implements CommandLineRunner {
         migrateItemColumns(sqlite);
         migrateFundFlowTable(sqlite);
         migrateUserWxOpenid(sqlite);
+        migrateWantTable(sqlite);
         migrateReviewTable(sqlite);
         migrateAnnouncementTable(sqlite);
         log.info("[DatabaseMigration] 数据库结构校验完成（sqlite={}）", sqlite);
@@ -93,6 +94,41 @@ public class DatabaseMigration implements CommandLineRunner {
             } catch (Exception e) {
                 log.warn("[DatabaseMigration] 新增字段 {} 失败：{}", name, e.getMessage());
             }
+        }
+    }
+
+    /** 求购表（幂等创建） */
+    private void migrateWantTable(boolean sqlite) {
+        String ddl;
+        if (sqlite) {
+            ddl = "CREATE TABLE IF NOT EXISTS want ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "user_id INTEGER NOT NULL, "
+                    + "title TEXT NOT NULL, "
+                    + "description TEXT DEFAULT NULL, "
+                    + "price_max REAL DEFAULT NULL, "
+                    + "category_id INTEGER DEFAULT NULL, "
+                    + "status TEXT NOT NULL DEFAULT '求购中', "
+                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)";
+        } else {
+            ddl = "CREATE TABLE IF NOT EXISTS want ("
+                    + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                    + "user_id BIGINT NOT NULL, "
+                    + "title VARCHAR(100) NOT NULL, "
+                    + "description TEXT, "
+                    + "price_max DECIMAL(10,2) DEFAULT NULL, "
+                    + "category_id INT DEFAULT NULL, "
+                    + "status VARCHAR(10) NOT NULL DEFAULT '求购中', "
+                    + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    + "INDEX idx_status (status), "
+                    + "INDEX idx_user (user_id)"
+                    + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        }
+        try {
+            jdbcTemplate.execute(ddl);
+            log.info("[DatabaseMigration] want 表结构校验完成");
+        } catch (Exception e) {
+            log.warn("[DatabaseMigration] 创建 want 表失败：{}", e.getMessage());
         }
     }
 
