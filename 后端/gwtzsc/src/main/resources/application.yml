@@ -24,7 +24,8 @@ mybatis-plus:
       id-type: auto
 
 jwt:
-  secret: "harbor-flea-market-secret-key-2024-this-is-a-very-long-and-secure-key-for-jwt"
+  # 开发默认密钥；生产环境必须在服务器 conf/application.yml 覆盖为独立强密钥（勿提交到仓库）
+  secret: "mj21+PCk2yzFCzSyioS+uqFNEc+gib+1qtgTRe5yHPnFgdwbTkjlDlPzUhv518VS"
   expiration: 86400000
 
 upload:
@@ -34,3 +35,22 @@ upload:
 wx:
   appid: ""
   secret: ""
+
+# CORS 允许的来源（生产环境在服务器 conf 覆盖）
+app:
+  cors:
+    allowed-origins:
+      - https://www.zxczhuanshu.xyz
+      - https://zxczhuanshu.xyz
+      - http://118.190.204.214
+      - http://localhost:3000
+      - http://127.0.0.1:3000
+      - http://localhost:8080
+
+# 接口限流（次数/窗口秒），Redis 计数；Redis 不可用时自动放行不影响业务
+rate-limit:
+  auth-login: 10/60
+  auth-register: 5/60
+  auth-sms: 5/3600
+  upload: 30/60
+  global: 300/60

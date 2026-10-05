@@ -126,9 +126,9 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.selectOne(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, username));
-        if (user == null) throw new RuntimeException("账号不存在");
+        if (user == null) throw new RuntimeException("账号或密码错误");
         if (user.getStatus() == 0) throw new RuntimeException("账号已被禁用");
-        if (!BCrypt.checkpw(password, user.getPassword())) throw new RuntimeException("密码错误");
+        if (!BCrypt.checkpw(password, user.getPassword())) throw new RuntimeException("账号或密码错误");
 
         return buildLoginResult(user);
     }
