@@ -1561,3 +1561,15 @@ input[type="tel"] { -webkit-appearance: none; }
 .up-stat { flex: 1; text-align: center; display: flex; flex-direction: column; gap: 2px; }
 .up-stat b { font-size: 18px; color: #333; }
 .up-stat span { font-size: 11px; color: #999; }
+
+/* ===================== 功能串联 UI ===================== */
+.want-hint { display: flex; align-items: center; gap: 8px; margin: 0 24rpx 12px; padding: 10px 14px; border-radius: 12px; background: linear-gradient(135deg, #eaf4ff, #f5faff); border: 1px solid #d6eaf8; font-size: 13px; color: #2c6aa0; cursor: pointer; }
+.want-hint b { color: #e67e22; }
+.want-hint .fa-angle-right { margin-left: auto; color: #a8c4dc; }
+.want-related { display: flex; align-items: center; gap: 8px; margin-top: 12px; overflow-x: auto; padding-bottom: 4px; }
+.wr-label { font-size: 11px; color: #999; flex-shrink: 0; }
+.wr-chip { display: flex; align-items: center; gap: 6px; background: #f8fafc; border: 1px solid #e8eef3; border-radius: 999px; padding: 4px 10px 4px 4px; cursor: pointer; flex-shrink: 0; }
+.want-card .wr-chip img { width: 26px !important; height: 26px !important; border-radius: 50% !important; object-fit: cover !important; display: block; }
+.wr-t { font-size: 11px; color: #555; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-p { font-size: 11px; color: #FF6B35; font-weight: 600; }
+.price-ref.want-ref b { color: #e67e22; }

@@ -1,5 +1,7 @@
 server:
   port: 8080
+  # 反代后还原真实协议/域名（否则同源页面会被 CORS 误判为跨域）
+  forward-headers-strategy: framework
 
 spring:
   jackson:

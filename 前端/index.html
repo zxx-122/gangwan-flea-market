@@ -486,6 +486,12 @@ const ItemDetail = {
                 </div>
                 <div class="detail-desc">{{detail.description || '暂无描述'}}</div>
             </div>
+            <!-- 同类求购需求提示（串联求购功能） -->
+            <div class="want-hint" v-if="wantCount > 0" @click="$router.push('/want')">
+                <i class="fa fa-bullhorn"></i>
+                <span>有 <b>{{wantCount}}</b> 人正在求购此类宝贝，你的闲置正好可以出手</span>
+                <i class="fa fa-angle-right"></i>
+            </div>
             <div class="detail-section">
                 <div class="detail-section-title">卖家信息</div>
                 <div class="seller-info">
@@ -635,6 +641,13 @@ const ItemDetail = {
         const sellerRating = ref(null);
         const sellerReviewCount = ref(0);
         const myBalance = ref(0);
+        const wantCount = ref(0);
+        function apiWantCount(catId) {
+            wantApi.list({ categoryId: catId, size: 1 }).then(res => {
+                const d = res.data;
+                wantCount.value = (d && d.total) || 0;
+            }).catch(() => {});
+        }
         const showReport = ref(false);
         function shareLink() {
             const url = window.location.href.split('#')[0] + '#/item/' + route.params.id;
@@ -721,6 +734,10 @@ const ItemDetail = {
                 const res = await itemApi.related(route.params.id, { limit: 8 });
                 relatedList.value = (res.data || []).slice(0, 4);
             } catch (e) {}
+            // 同类求购需求数量（串联求购专区）
+            if (detail.value.categoryId) {
+                apiWantCount(detail.value.categoryId);
+            }
             // 卖家真实评分 + 宝贝评价列表
             try {
                 const sum = await reviewApi.userSummary(detail.value.userId);
@@ -773,7 +790,7 @@ const ItemDetail = {
         return {
             detail, loading, images, currentImg, imgIdx, favorited, showBuy, lightbox,
             submitting, order, isOwner, sellerIncome, relatedList,
-            reviews, sellerRating, sellerReviewCount, myBalance, balanceShort, openBuy,
+            reviews, sellerRating, sellerReviewCount, myBalance, balanceShort, openBuy, wantCount,
             showReport, reportReason, reportReasons, openReport, submitReport, shareLink,
             prevImg, nextImg, load, loadRelated, toggleFav, contactSeller, submitOrder,
             imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
@@ -817,6 +834,9 @@ const Publish = {
                 </div>
                 <div class="price-ref" v-else-if="priceRef && priceRef.loaded && priceRef.count===0">
                     <i class="fa fa-info-circle"></i> 该分类暂无在售商品，可参考其他平台定价
+                </div>
+                <div class="price-ref want-ref" v-if="wantHint > 0" style="background:#eaf4ff;color:#2c6aa0;">
+                    <i class="fa fa-bullhorn"></i> 该分类现有 <b>{{wantHint}}</b> 条求购需求，你的宝贝可能正是别人在找的
                 </div>
             </div>
             <div class="form-group">
@@ -867,6 +887,13 @@ const Publish = {
         const submitting = ref(false);
         const tagOptions = ['全新', '几乎全新', '一机一图', '已验机', '砍价嚒怪勿扰', '支持当面交易'];
         const priceRef = reactive({ count: 0, avg: null, min: null, max: null, loaded: false });
+        const wantHint = ref(0);
+        function fetchWantHint() {
+            wantApi.list({ categoryId: form.categoryId, size: 1 }).then(res => {
+                const d = res.data;
+                wantHint.value = (d && d.total) || 0;
+            }).catch(() => { wantHint.value = 0; });
+        }
         const form = reactive({ title: '', price: '', categoryId: null, condition: '', description: '', tags: [], isOriginal: 1, isFreeShip: 0, stock: 1, images: [] });
 
         function toggleTag(t) {
@@ -946,7 +973,7 @@ const Publish = {
 
         onMounted(() => { store.loadCategories(); loadEdit(); });
         watch(() => form.categoryId, () => { fetchPriceRef(); });
-        return { editId, form, submitting, onPick, removeImg, submit, store, tagOptions, priceRef, toggleTag, fetchPriceRef, imgUrl: getImageUrl, fmtPrice };
+        return { editId, form, submitting, onPick, removeImg, submit, store, tagOptions, priceRef, wantHint, toggleTag, fetchPriceRef, imgUrl: getImageUrl, fmtPrice };
     }
 };
 
@@ -1053,6 +1080,7 @@ const Orders = {
                 </div>
                 <div class="order-footer">
                     <span class="order-no" v-if="o.status==='已完成'">实付 ¥{{fmtPrice(o.price)}}</span>
+                    <button class="btn btn-sm btn-ghost" @click="$router.push('/chat/'+o.sellerId)"><i class="fa fa-comment-o"></i> 联系卖家</button>
                     <button class="btn btn-sm btn-ghost" v-if="o.status==='待发货'" @click="cancel(o.id)"><i class="fa fa-times"></i> 取消订单</button>
                     <button class="btn btn-sm btn-primary" v-if="o.status==='待收货'" @click="confirm(o.id)"><i class="fa fa-check"></i> 确认收货</button>
                     <button class="btn btn-sm btn-outline" v-if="o.status==='已完成'" @click="openReview(o)"><i class="fa fa-star-o"></i> 评价卖家</button>
@@ -1249,6 +1277,7 @@ const Sales = {
                 </div>
                 <div class="order-footer" style="margin-top:12px;">
                     <span class="order-no" v-if="o.status==='已完成'">实收 ¥{{fmtPrice(o.sellerIncome)}}（佣金 ¥{{fmtPrice(o.commission)}}）</span>
+                    <button class="btn btn-sm btn-ghost" @click="$router.push('/chat/'+o.buyerId)"><i class="fa fa-comment-o"></i> 联系买家</button>
                     <button class="btn btn-sm btn-primary" v-if="o.status==='待发货'" @click="ship(o.id)"><i class="fa fa-truck"></i> 去发货</button>
                     <button class="btn btn-sm btn-outline" v-if="o.status==='已完成'" @click="openReview(o)"><i class="fa fa-star-o"></i> 评价买家</button>
                 </div>
@@ -1918,6 +1947,14 @@ const Want = {
                 </div>
                 <div class="want-title">{{w.title}}</div>
                 <div class="want-desc" v-if="w.description">{{w.description}}</div>
+                <div class="want-related" v-if="w.related && w.related.length">
+                    <span class="wr-label">可能符合：</span>
+                    <span class="wr-chip" v-for="g in w.related" :key="g.id" @click="$router.push('/item/'+g.id)">
+                        <img v-if="g.img" :src="g.img">
+                        <span class="wr-t">{{g.title}}</span>
+                        <span class="wr-p">¥{{g.priceTxt}}</span>
+                    </span>
+                </div>
                 <div class="want-bottom">
                     <div class="want-price" v-if="w.priceMax">期望 ≤ <b>¥{{fmtPrice(w.priceMax)}}</b></div>
                     <div class="want-meta" v-if="!mine">
@@ -1992,7 +2029,20 @@ const Want = {
             req.then(res => {
                 const data = res.data;
                 const arr = (data && data.data) ? data.data : (data || []);
-                list.value = arr.map(w => ({ ...w, priceTxt: fmtPrice(w.priceMax) }));
+                const decorated = arr.map(w => ({ ...w, priceTxt: fmtPrice(w.priceMax), related: [] }));
+                // 串联商品：求购中且带分类的前 5 条，预取同分类在售宝贝，全部就绪后一次性渲染
+                const prefetch = decorated
+                    .filter(w => w.status === '求购中' && w.categoryId).slice(0, 5)
+                    .map(w => itemApi.list({ categoryId: w.categoryId, size: 3, sort: 'hot' })
+                        .then(res2 => {
+                            w.related = ((res2.data && res2.data.data) || []).map(g => ({
+                                id: g.id, title: g.title, priceTxt: fmtPrice(g.price),
+                                img: getImageUrl(g.mainImage || (g.images && g.images[0]))
+                            }));
+                        }).catch(() => {}));
+                return Promise.all(prefetch).then(() => decorated);
+            }).then(decorated => {
+                list.value = decorated;
                 loading.value = false;
             }).catch(e => { showToast(e.message); loading.value = false; });
         }
