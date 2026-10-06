@@ -425,4 +425,25 @@ public class ItemServiceImpl implements ItemService {
             return map;
         }).collect(Collectors.toList());
     }
+
+    @Override
+    public List<Map<String, Object>> decoratePublicList(List<Item> items) {
+        Map<Long, List<String>> imagesByItem = itemImageService.getImagesByItemIds(
+                items.stream().map(Item::getId).collect(Collectors.toList()));
+        return items.stream().map(item -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", item.getId());
+            m.put("title", item.getTitle());
+            m.put("price", item.getPrice());
+            m.put("condition", item.getCondition());
+            m.put("isFreeShip", item.getIsFreeShip());
+            m.put("isOriginal", item.getIsOriginal());
+            m.put("views", item.getViews());
+            m.put("createdAt", item.getCreatedAt() != null ? item.getCreatedAt().toString() : null);
+            List<String> images = imagesByItem.getOrDefault(item.getId(), Collections.emptyList());
+            m.put("images", images);
+            m.put("mainImage", images.isEmpty() ? null : images.get(0));
+            return m;
+        }).collect(Collectors.toList());
+    }
 }

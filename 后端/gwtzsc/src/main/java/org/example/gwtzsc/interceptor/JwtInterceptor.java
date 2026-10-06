@@ -16,9 +16,9 @@ public class JwtInterceptor implements HandlerInterceptor {
     private static final Pattern ITEM_RELATED = Pattern.compile("^/api/item/\\d+/related$");
     /** 商品详情：游客可浏览（下单/收藏/聊天等操作仍需登录） */
     private static final Pattern ITEM_DETAIL = Pattern.compile("^/api/item/\\d+$");
-    /** 商品/用户评价、公告列表、求购列表：游客可看 */
+    /** 商品/用户评价、公告列表、求购列表、用户公开主页：游客可看 */
     private static final Pattern PUBLIC_GET = Pattern.compile(
-            "^/api/review/item/\\d+$|^/api/review/user/\\d+$|^/api/review/user/\\d+/summary$|^/api/announcement/list$|^/api/want/list$");
+            "^/api/review/item/\\d+$|^/api/review/user/\\d+$|^/api/review/user/\\d+/summary$|^/api/announcement/list$|^/api/want/list$|^/api/user/\\d+/public$|^/api/user/\\d+/items$");
 
     @Autowired
     private JwtUtil jwtUtil;

@@ -34,8 +34,10 @@ api.interceptors.response.use(
             if (code === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                if (!window.location.hash.includes('#/login')) {
-                    window.location.hash = '/login';
+                if (!window.location.pathname.endsWith('login.html')) {
+                    // 记住当前页面，登录后跳回
+                    const back = encodeURIComponent(window.location.href);
+                    window.location.href = 'login.html?back=' + back;
                 }
             }
             return Promise.reject(new Error(msg || '请求失败'));
@@ -77,6 +79,12 @@ const reviewApi = {
     byItem(itemId) { return api.get('/review/item/' + itemId); },
     byUser(userId) { return api.get('/review/user/' + userId); },
     userSummary(userId) { return api.get('/review/user/' + userId + '/summary'); }
+};
+
+// ===================== 公开用户主页接口 =====================
+const publicUserApi = {
+    profile(id) { return api.get('/user/' + id + '/public', null, { silent: true }); },
+    items(id, params) { return api.get('/user/' + id + '/items', params, { silent: true }); }
 };
 
 // ===================== 求购接口 =====================

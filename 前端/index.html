@@ -179,9 +179,11 @@ const Home = {
                         <span class="item-cond" v-if="it.condition">{{it.condition}}</span>
                     </div>
                     <div class="item-extra">
-                        <img class="seller-avatar" v-if="it.seller && it.seller.avatar" :src="imgUrl(it.seller.avatar)">
-                        <i class="fa fa-user-circle seller-avatar-ph" v-else></i>
-                        <span class="seller-name">{{it.seller ? (it.seller.nickname || '同学') : '同学'}}</span>
+                        <span class="seller-line" @click.stop="$router.push('/user/'+it.seller.id)" v-if="it.seller">
+                            <img class="seller-avatar" v-if="it.seller.avatar" :src="imgUrl(it.seller.avatar)">
+                            <i class="fa fa-user-circle seller-avatar-ph" v-else></i>
+                            <span class="seller-name">{{it.seller.nickname || '同学'}}</span>
+                        </span>
                         <span class="item-views">{{it.views||0}}浏览</span>
                     </div>
                 </div>
@@ -492,7 +494,7 @@ const ItemDetail = {
                         <i v-else class="fa fa-user"></i>
                     </div>
                     <div class="seller-detail">
-                        <div class="seller-name">{{detail.seller ? (detail.seller.nickname || detail.seller.username) : '匿名卖家'}}</div>
+                        <div class="seller-name" style="cursor:pointer;" @click="$router.push('/user/'+detail.userId)">{{detail.seller ? (detail.seller.nickname || detail.seller.username) : '匿名卖家'}} <i class="fa fa-angle-right" style="color:#ccc;"></i></div>
                         <div class="seller-meta">发布于 {{shortTime(detail.createdAt)}}</div>
                     </div>
                     <div class="seller-stats" v-if="detail.seller && detail.seller.stats">
@@ -500,7 +502,8 @@ const ItemDetail = {
                         <span class="stat-item"><b>{{detail.seller.stats.onSaleCount||0}}</b> 在售</span>
                         <span class="stat-item"><b>{{sellerRating || '5.0'}}</b> 评分<span v-if="sellerReviewCount"> ({{sellerReviewCount}}评)</span></span>
                     </div>
-                    <div style="width:100%;text-align:right;margin-top:6px;">
+                    <div style="width:100%;text-align:right;margin-top:6px;display:flex;justify-content:flex-end;gap:14px;">
+                        <span style="font-size:11px;color:#bbb;cursor:pointer;" @click="shareLink"><i class="fa fa-share-alt"></i> 分享</span>
                         <span style="font-size:11px;color:#bbb;cursor:pointer;" @click="openReport"><i class="fa fa-warning"></i> 举报此商品</span>
                     </div>
                 </div>
@@ -633,6 +636,10 @@ const ItemDetail = {
         const sellerReviewCount = ref(0);
         const myBalance = ref(0);
         const showReport = ref(false);
+        function shareLink() {
+            const url = window.location.href.split('#')[0] + '#/item/' + route.params.id;
+            copyText(url).then(() => {}).catch(() => {});
+        }
         const reportReason = ref('');
         const reportReasons = ['虚假商品', '违禁物品', '涉嫌欺诈', '描述严重不符', '其他违规'];
         function openReport() {
@@ -767,7 +774,7 @@ const ItemDetail = {
             detail, loading, images, currentImg, imgIdx, favorited, showBuy, lightbox,
             submitting, order, isOwner, sellerIncome, relatedList,
             reviews, sellerRating, sellerReviewCount, myBalance, balanceShort, openBuy,
-            showReport, reportReason, reportReasons, openReport, submitReport,
+            showReport, reportReason, reportReasons, openReport, submitReport, shareLink,
             prevImg, nextImg, load, loadRelated, toggleFav, contactSeller, submitOrder,
             imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr
         };
@@ -1097,6 +1104,12 @@ const Orders = {
                     <div class="od-row"><span>收货人</span><b>{{orderDetail.receiverName}} {{orderDetail.receiverPhone}}</b></div>
                     <div class="od-row"><span>收货地址</span><span style="text-align:right;">{{orderDetail.receiverAddress}}</span></div>
                 </div>
+                <div class="od-section" v-if="myReviewOfDetail" style="background:#fffaf2;border:1px solid #ffd9b8;">
+                    <div class="od-row"><span>我的评价</span>
+                        <span class="review-stars"><i v-for="n in 5" :key="n" class="fa" :class="n <= myReviewOfDetail.rating ? 'fa-star' : 'fa-star-o'"></i></span>
+                    </div>
+                    <div style="margin-top:6px;">{{myReviewOfDetail.content || '未填写内容'}}</div>
+                </div>
                 <div class="logistics-box" style="margin:10px 0 0;" v-if="orderDetail.courierCompany" :class="{done: orderDetail.status==='已完成'}">
                     <div class="lg-icon"><i class="fa fa-truck"></i></div>
                     <div class="lg-info">
@@ -1160,11 +1173,21 @@ const Orders = {
                 load();
             } catch (e) { showToast(e.message); }
         }
+        const myReviewOfDetail = ref(null);
         async function showDetail(id) {
             try {
                 const res = await orderApi.getById(id);
                 orderDetail.value = res.data || res;
+                myReviewOfDetail.value = null;
                 showDetailModal.value = true;
+                // 已完成的订单顺带查我的评价，弹窗内展示
+                if (orderDetail.value && orderDetail.value.status === '已完成') {
+                    try {
+                        const rv = await reviewApi.byOrder(id);
+                        const mine = (rv.data || []).find(r => r.direction === 'B2S');
+                        myReviewOfDetail.value = mine || null;
+                    } catch (e) {}
+                }
             } catch (e) { showToast(e.message); }
         }
         function statusClass(s) {
@@ -1179,7 +1202,7 @@ const Orders = {
             return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
         }
         onMounted(load);
-        return { orders, loading, orderDetail, showDetailModal, cancel, confirm, showDetail, statusClass, statusIcon, shortDate, copyText,
+        return { orders, loading, orderDetail, showDetailModal, cancel, confirm, showDetail, statusClass, statusIcon, shortDate, copyText, myReviewOfDetail,
                  showReview, reviewForm, openReview, submitReview, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
     }
 };
@@ -1898,9 +1921,11 @@ const Want = {
                 <div class="want-bottom">
                     <div class="want-price" v-if="w.priceMax">期望 ≤ <b>¥{{fmtPrice(w.priceMax)}}</b></div>
                     <div class="want-meta" v-if="!mine">
-                        <img class="want-avatar" v-if="w.publisherAvatar" :src="imgUrl(w.publisherAvatar)">
-                        <i class="fa fa-user-circle" v-else></i>
-                        <span>{{w.publisherName}}</span>
+                        <span class="want-pub" @click="$router.push('/user/'+w.userId)">
+                            <img class="want-avatar" v-if="w.publisherAvatar" :src="imgUrl(w.publisherAvatar)">
+                            <i class="fa fa-user-circle" v-else></i>
+                            <span>{{w.publisherName}}</span>
+                        </span>
                         <span style="color:#ccc;">·</span>
                         <span>{{shortTime(w.createdAt)}}</span>
                     </div>
@@ -1908,7 +1933,10 @@ const Want = {
                         <button class="btn btn-sm btn-outline" v-if="w.status==='求购中'" @click="setStatus(w.id,'已成交')">标记成交</button>
                         <button class="btn btn-sm btn-ghost" @click="setStatus(w.id, w.status==='求购中' ? '已下架' : '求购中')">{{w.status==='求购中' ? '下架' : '重新求购'}}</button>
                     </div>
-                    <button class="btn btn-sm btn-primary" v-if="!mine && w.status==='求购中' && store.user && store.user.id===w.userId" @click="setStatus(w.id,'已成交')">标记成交</button>
+                    <div class="want-ops" v-if="!mine && w.status==='求购中'">
+                        <button class="btn btn-sm btn-ghost" v-if="store.user && store.user.id===w.userId" @click="setStatus(w.id,'已成交')">标记成交</button>
+                        <button class="btn btn-sm btn-primary" v-else @click="contactPublisher(w.userId)"><i class="fa fa-comment-o"></i> 联系Ta</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1949,6 +1977,7 @@ const Want = {
     </div>`,
     setup() {
         const route = useRoute();
+        const router = useRouter();
         const store = window.store;
         const mine = ref(route.query.mine === '1');
         const list = ref([]);
@@ -1984,8 +2013,122 @@ const Want = {
         }
 
         onMounted(() => { store.loadCategories(); load(); });
-        return { route, store, mine, list, loading, showForm, submitting, form, load, openForm, submit, setStatus,
+        function contactPublisher(userId) {
+            if (!requireLogin(router)) return;
+            router.push('/chat/' + userId);
+        }
+
+        return { route, store, mine, list, loading, showForm, submitting, form, load, openForm, submit, setStatus, contactPublisher,
                  imgUrl: getImageUrl, fmtPrice, shortTime: formatTime };
+    }
+};
+
+// ===================== 用户主页（公开） =====================
+const UserPage = {
+    template: `
+    <div class="page-no-tabbar">
+        <div class="navbar glass">
+            <div class="navbar-back" @click="$router.back()"><i class="fa fa-arrow-left"></i></div>
+            <div class="navbar-title">卖家主页</div>
+            <div class="navbar-right"></div>
+        </div>
+        <div v-if="loading" style="padding:40px;text-align:center;color:#999;">加载中...</div>
+        <div v-else-if="!profile" class="empty-state"><div class="icon"><i class="fa fa-user-secret"></i></div><div class="text">用户不存在</div></div>
+        <div v-else>
+            <div class="up-head">
+                <div class="up-avatar">
+                    <img v-if="profile.avatar" :src="imgUrl(profile.avatar)">
+                    <i v-else class="fa fa-user"></i>
+                </div>
+                <div class="up-info">
+                    <div class="up-name">{{profile.nickname}}</div>
+                    <div class="up-sub">加入于 {{shortTime(profile.createdAt)}}</div>
+                </div>
+                <button class="btn btn-sm btn-primary" @click="contact"><i class="fa fa-comment-o"></i> 聊一聊</button>
+            </div>
+            <div class="up-stats">
+                <div class="up-stat"><b>{{profile.soldCount}}</b><span>成交</span></div>
+                <div class="up-stat"><b>{{profile.onSaleCount}}</b><span>在售</span></div>
+                <div class="up-stat"><b>{{rating || '5.0'}}</b><span>评分</span></div>
+                <div class="up-stat"><b>{{reviewCount}}</b><span>评价</span></div>
+            </div>
+
+            <div class="detail-section" style="margin-top:14px;">
+                <div class="detail-section-title">TA 的在售宝贝 ({{items.length}})</div>
+                <div class="waterfall" v-if="items.length">
+                    <div class="item-card liquid-card" v-for="it in items" :key="it.id" @click="$router.push('/item/'+it.id)">
+                        <div class="item-img-wrap">
+                            <img class="item-img" loading="lazy" :src="imgUrl(it.mainImage || (it.images && it.images[0]))" @error="onImgErr">
+                            <span class="corner-tag free" v-if="parseFloat(it.price)===0">免费送</span>
+                            <span class="corner-tag ship" v-else-if="it.isFreeShip===1">包邮</span>
+                        </div>
+                        <div class="item-info">
+                            <div class="item-title">{{it.title}}</div>
+                            <div class="item-price">
+                                <span v-if="parseFloat(it.price)===0" class="free-label">免费送</span>
+                                <template v-else><span class="unit">¥</span>{{fmtPrice(it.price)}}</template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="empty-state" v-else><div class="text">暂无在售商品</div></div>
+            </div>
+
+            <div class="detail-section" v-if="reviews.length">
+                <div class="detail-section-title">收到的评价 ({{reviewCount}})</div>
+                <div class="review-item" v-for="rv in reviews.slice(0, 10)" :key="rv.id">
+                    <div class="review-head">
+                        <div class="review-user">
+                            <img v-if="rv.user && rv.user.avatar" :src="imgUrl(rv.user.avatar)">
+                            <i v-else class="fa fa-user"></i>
+                            <span>{{rv.user ? rv.user.nickname : '匿名'}}</span>
+                        </div>
+                        <div class="review-stars">
+                            <i v-for="n in 5" :key="n" class="fa" :class="n <= rv.rating ? 'fa-star' : 'fa-star-o'"></i>
+                        </div>
+                    </div>
+                    <div class="review-content">{{rv.content || '该用户没有填写评价内容'}}</div>
+                    <div class="review-time">{{shortTime(rv.createdAt)}}</div>
+                </div>
+            </div>
+        </div>
+    </div>`,
+    setup() {
+        const route = useRoute();
+        const router = useRouter();
+        const userId = route.params.userId;
+        const profile = ref(null);
+        const items = ref([]);
+        const reviews = ref([]);
+        const rating = ref(null);
+        const reviewCount = ref(0);
+        const loading = ref(true);
+
+        function load() {
+            publicUserApi.profile(userId).then(res => {
+                profile.value = res.data;
+                loading.value = false;
+            }).catch(e => { showToast(e.message); loading.value = false; });
+            publicUserApi.items(userId, { page: 1, size: 24 }).then(res => {
+                const d = res.data;
+                const arr = (d && d.data) ? d.data : (d || []);
+                items.value = arr;
+            }).catch(() => {});
+            reviewApi.userSummary(userId).then(res => {
+                rating.value = res.data && res.data.avgRating;
+                reviewCount.value = res.data ? res.data.count : 0;
+            }).catch(() => {});
+            reviewApi.byUser(userId).then(res => {
+                reviews.value = res.data || [];
+            }).catch(() => {});
+        }
+        function contact() {
+            if (!requireLogin(router)) return;
+            router.push('/chat/' + userId);
+        }
+        onMounted(load);
+        return { profile, items, reviews, rating, reviewCount, loading, contact,
+                 imgUrl: getImageUrl, fmtPrice, shortTime: formatTime, onImgErr };
     }
 };
 
@@ -2015,6 +2158,7 @@ const routes = [
     { path: '/favorites', component: Favorites, meta: { requireAuth: true } },
     { path: '/history', component: History },
     { path: '/want', component: Want },
+    { path: '/user/:userId', component: UserPage },
     { path: '/wallet', component: Wallet, meta: { requireAuth: true } },
     { path: '/profile', component: Profile, meta: { tab: 'profile' } },
     { path: '/login', component: {

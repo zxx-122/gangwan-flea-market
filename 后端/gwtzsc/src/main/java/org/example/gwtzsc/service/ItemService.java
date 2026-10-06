@@ -23,4 +23,7 @@ public interface ItemService {
     PageResult<Map<String, Object>> searchUserItems(Long userId, String keyword, int page, int size);
     List<Map<String, Object>> getRelated(Long id, int limit);
     Map<String, Object> getPriceRef(Integer categoryId);
+
+    /** 公开用户主页用：商品卡片脱敏列表（只含展示字段） */
+    java.util.List<Map<String, Object>> decoratePublicList(List<Item> items);
 }
