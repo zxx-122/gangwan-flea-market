@@ -190,6 +190,38 @@ function showToast(msg, duration) {
     setTimeout(() => el.remove(), duration);
 }
 
+// 图片压缩：长边超过 maxSide 时等比缩放并转 JPEG（质量 0.85），大幅减小上传体积
+function compressImage(file, maxSide) {
+    maxSide = maxSide || 1600;
+    return new Promise((resolve) => {
+        // 非图片或 GIF（动图压缩会丢帧）直接原样返回
+        if (!file.type || !file.type.startsWith('image/') || file.type === 'image/gif') return resolve(file);
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                if (img.width <= maxSide && img.height <= maxSide && file.size < 500 * 1024) return resolve(file);
+                let w = img.width, h = img.height;
+                if (w > h && w > maxSide) { h = h * maxSide / w; w = maxSide; }
+                else if (h >= w && h > maxSide) { w = w * maxSide / h; h = maxSide; }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                canvas.toBlob(blob => {
+                    if (!blob) return resolve(file);
+                    // PNG 带透明时保留 PNG，否则转 JPEG
+                    const isPng = file.type === 'image/png' && blob.type === 'image/png';
+                    resolve(new File([blob], (file.name || 'img').replace(/\.[^.]+$/, '') + (isPng ? '.png' : '.jpg'), { type: isPng ? 'image/png' : 'image/jpeg' }));
+                }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85);
+            };
+            img.onerror = () => resolve(file);
+            img.src = reader.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+    });
+}
+
 // 复制文本到剪贴板（用于复制运单号等）
 function copyText(text) {
     if (!text) return Promise.reject();

@@ -882,7 +882,8 @@ const Publish = {
             for (const f of files) {
                 if (form.images.length >= 9) break;
                 try {
-                    const res = await uploadApi.uploadImage(f);
+                    const compressed = await compressImage(f, 1600);
+                    const res = await uploadApi.uploadImage(compressed);
                     form.images.push(res.data.url);
                 } catch (err) { showToast(err.message); }
             }
@@ -1648,7 +1649,8 @@ const Profile = {
             e.target.value = '';
             if (!f) return;
             try {
-                const res = await userApi.uploadAvatar(f);
+                const compressed = await compressImage(f, 500);
+                const res = await userApi.uploadAvatar(compressed);
                 const d = res.data;
                 const url = typeof d === 'string' ? d : (d.url || d.avatar);
                 if (url) store.setUser({ ...store.user, avatar: url });
