@@ -3,13 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="校园好物市场（港湾跳蚤市场）——校园闲置二手交易平台：发布闲置、求购好物、担保交易、当面自提，让闲置遇见新主人。">
+    <meta name="theme-color" content="#FF7A45">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="好物市场">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>管理后台 - 港湾跳蚤市场</title>
     <link href="lib/font-awesome/css/font-awesome.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20261008">
-    <script src="js/config.js?v=20261008"></script>
+    <link rel="stylesheet" href="css/style.css?v=20261009">
+    <script src="js/config.js?v=20261009"></script>
     <script src="lib/axios.min.js"></script>
-    <script src="js/api.js?v=20261008"></script>
-    <script src="js/effects.js?v=20261008"></script>
+    <script src="js/api.js?v=20261009"></script>
+    <script src="js/effects.js?v=20261009"></script>
     <!-- 管理后台样式由 css/style.css 统一提供，已升级为深色玻璃拟态风格 -->
 </head>
 <body>
@@ -188,6 +196,7 @@
                         <option value="">全部状态</option><option>待发货</option><option>待收货</option><option>已完成</option><option>已取消</option>
                     </select>
                     <button class="btn btn-primary" @click="loadOrders(1)"><i class="fa fa-search"></i></button>
+                    <button class="btn btn-ghost" @click="exportOrdersCsv" title="按当前筛选条件导出全部订单"><i class="fa fa-download"></i> 导出CSV</button>
                 </div>
                 <div class="admin-table-wrap">
                     <table class="admin-table">
@@ -490,6 +499,27 @@ createApp({
             try { await announcementApi.update(a.id, { enabled: a.enabled === 1 ? 0 : 1 }); showToast(a.enabled === 1 ? '已停用' : '已启用'); loadAnnouncements(); }
             catch (e) { showToast(e.message); }
         }
+        // 按当前筛选导出全部订单 CSV（Excel 兼容：UTF-8 BOM + 逗号分隔）
+        async function exportOrdersCsv() {
+            try {
+                showToast('正在导出...');
+                const res = await adminApi.getOrders({ page: 1, size: 1000, status: orderStatus.value, keyword: orderKw.value });
+                const list = (res.data && res.data.data) || [];
+                if (!list.length) return showToast('当前筛选没有订单');
+                const head = ['订单号', '商品', '卖家', '买家', '价格', '佣金', '卖家收入', '状态', '快递公司', '运单号', '收货人', '收货电话', '收货地址', '下单时间'];
+                const esc = v => { v = (v === null || v === undefined) ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+                const rows = list.map(o => [o.orderNo, o.itemTitle, o.sellerName, o.buyerName, o.price, o.commission, o.sellerIncome, o.status, o.courierCompany, o.trackingNo, o.receiverName, o.receiverPhone, o.receiverAddress, shortTime(o.createdAt)].map(esc).join(','));
+                const csv = '﻿' + head.join(',') + '\n' + rows.join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'orders-' + new Date().toISOString().slice(0, 10) + '.csv';
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showToast('已导出 ' + list.length + ' 笔订单');
+            } catch (e) { showToast(e.message); }
+        }
+
         async function deleteAnn(id) {
             if (!await showModal('确认删除', '删除后用户端将不再显示该公告，确定吗？')) return;
             try { await announcementApi.remove(id); showToast('已删除'); loadAnnouncements(); }
@@ -588,7 +618,7 @@ createApp({
                  loadCategories, openCatForm, submitCategory, deleteCategory,
                  announcements, showAnnForm, annEditMode, annForm,
                  loadAnnouncements, openAnnForm, submitAnn, toggleAnn, deleteAnn,
-                 reports, reportStatus, reportPage, reportTotal, loadReports, handleReport, deleteReport, offlineReportedItem };
+                 reports, reportStatus, reportPage, reportTotal, loadReports, handleReport, deleteReport, offlineReportedItem , exportOrdersCsv };
     }
 }).mount('#adminApp');
 </script>

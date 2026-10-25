@@ -1,0 +1,15 @@
+{
+  "name": "校园好物市场",
+  "short_name": "好物市场",
+  "description": "校园闲置二手交易平台，让闲置好物遇见新主人",
+  "start_url": "/gwtzsc/index.html",
+  "scope": "/gwtzsc/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff7f2",
+  "theme_color": "#FF7A45",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
