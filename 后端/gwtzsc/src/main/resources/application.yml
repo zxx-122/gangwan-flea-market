@@ -26,8 +26,8 @@ mybatis-plus:
       id-type: auto
 
 jwt:
-  # 开发默认密钥；生产环境必须在服务器 conf/application.yml 覆盖为独立强密钥（勿提交到仓库）
-  secret: "mj21+PCk2yzFCzSyioS+uqFNEc+gib+1qtgTRe5yHPnFgdwbTkjlDlPzUhv518VS"
+  # ⚠️ 仅本地开发用！生产密钥只存服务器 /opt/gwtzsc/conf/application.yml，绝不写入本文件（公开仓库）
+  secret: "RBZkSBQ7nU_LjQS2al8xnjP9D_13GlB7PTug5Ol9Z2QRVZ22KLUepdB-RUg-Lfzc"
   expiration: 86400000
 
 upload:
