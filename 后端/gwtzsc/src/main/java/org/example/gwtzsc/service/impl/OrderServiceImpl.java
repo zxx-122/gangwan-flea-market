@@ -60,11 +60,19 @@ public class OrderServiceImpl implements OrderService {
         Item item = itemMapper.selectById(req.getItemId());
         if (item == null) throw new RuntimeException("商品不存在");
         if (!"在售".equals(item.getStatus())) throw new RuntimeException("商品已下架或已售出");
-        int stock = item.getStock() == null ? 1 : item.getStock();
-        if (stock <= 0) throw new RuntimeException("商品库存不足");
         if (item.getUserId().equals(buyerId)) throw new RuntimeException("不能购买自己的商品");
 
         BigDecimal price = item.getPrice();
+
+        // 下单时校验买家余额：确认收货即扣款，提前拦截避免订单卡死在"待收货"
+        User buyer = userMapper.selectById(buyerId);
+        if (buyer == null) throw new RuntimeException("用户不存在");
+        if (buyer.getStatus() != null && buyer.getStatus() == 0) throw new RuntimeException("账号已被禁用");
+        if (buyer.getBalance().compareTo(price) < 0) throw new RuntimeException("余额不足，请先充值");
+
+        // 原子扣减库存（售罄自动置为已售），影响行数为 0 说明库存已被并发订单抢完
+        if (itemMapper.deductStock(item.getId()) == 0) throw new RuntimeException("商品库存不足");
+
         BigDecimal commission = price.multiply(COMMISSION_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal sellerIncome = price.subtract(commission).setScale(2, RoundingMode.HALF_UP);
 
@@ -81,12 +89,6 @@ public class OrderServiceImpl implements OrderService {
         order.setReceiverPhone(req.getReceiverPhone());
         order.setReceiverAddress(req.getReceiverAddress());
         orderMapper.insert(order);
-
-        // 扣减库存，售罄自动置为已售
-        int remain = stock - 1;
-        item.setStock(remain);
-        if (remain <= 0) item.setStatus("已售");
-        itemMapper.updateById(item);
 
         clearHomeItemCache();
         redisTemplate.delete("item:" + item.getId());
@@ -118,8 +120,11 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderMapper.selectById(orderId);
         if (order == null) throw new RuntimeException("订单不存在");
         if (!order.getSellerId().equals(sellerId)) throw new RuntimeException("无权操作此订单");
-        if (!"待发货".equals(order.getStatus())) throw new RuntimeException("当前状态无法发货");
 
+        // CAS 状态流转：仅"待发货"可发货，防止并发重复操作
+        if (orderMapper.casStatus(orderId, "待发货", "待收货") == 0) {
+            throw new RuntimeException("当前状态无法发货");
+        }
         order.setStatus("待收货");
         order.setCourierCompany(courierCompany);
         order.setTrackingNo(trackingNo);
@@ -133,30 +138,29 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderMapper.selectById(orderId);
         if (order == null) throw new RuntimeException("订单不存在");
         if (!order.getBuyerId().equals(buyerId)) throw new RuntimeException("无权操作此订单");
-        if (!"待收货".equals(order.getStatus())) throw new RuntimeException("当前状态无法确认收货");
 
+        // CAS 占位：只有第一个请求能把"待收货"改为"已完成"，防止并发双重结算
+        if (orderMapper.casStatus(orderId, "待收货", "已完成") == 0) {
+            throw new RuntimeException("当前状态无法确认收货");
+        }
         order.setStatus("已完成");
         order.setCompletedAt(LocalDateTime.now());
         orderMapper.updateById(order);
 
-        // 结算：扣买家余额，加卖家余额
+        // 结算：原子扣买家余额（余额不足则整单回滚，订单恢复"待收货"）
+        if (userMapper.deductBalance(order.getBuyerId(), order.getPrice()) == 0) {
+            throw new RuntimeException("买家余额不足，请先充值");
+        }
         User buyer = userMapper.selectById(order.getBuyerId());
-        if (buyer != null) {
-            if (buyer.getBalance().compareTo(order.getPrice()) < 0) {
-                throw new RuntimeException("买家余额不足，请先充值");
-            }
-            buyer.setBalance(buyer.getBalance().subtract(order.getPrice()));
-            userMapper.updateById(buyer);
-            fundFlowService.record(buyer.getId(), "EXPENSE", order.getPrice(), buyer.getBalance(),
-                    "购买商品支出", order.getId());
-        }
+        fundFlowService.record(order.getBuyerId(), "EXPENSE", order.getPrice(),
+                buyer != null ? buyer.getBalance() : null, "购买商品支出", order.getId());
+
+        // 原子加卖家余额
+        userMapper.increaseBalance(order.getSellerId(), order.getSellerIncome());
         User seller = userMapper.selectById(order.getSellerId());
-        if (seller != null) {
-            seller.setBalance(seller.getBalance().add(order.getSellerIncome()));
-            userMapper.updateById(seller);
-            fundFlowService.record(seller.getId(), "INCOME", order.getSellerIncome(), seller.getBalance(),
-                    "出售商品收入", order.getId());
-        }
+        fundFlowService.record(order.getSellerId(), "INCOME", order.getSellerIncome(),
+                seller != null ? seller.getBalance() : null, "出售商品收入", order.getId());
+
         clearHomeItemCache();
     }
 
@@ -166,20 +170,13 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderMapper.selectById(orderId);
         if (order == null) throw new RuntimeException("订单不存在");
         if (!order.getBuyerId().equals(buyerId)) throw new RuntimeException("无权操作此订单");
-        if (!"待发货".equals(order.getStatus())) throw new RuntimeException("当前状态无法取消");
 
-        order.setStatus("已取消");
-        orderMapper.updateById(order);
-
-        Item item = itemMapper.selectById(order.getItemId());
-        if (item != null) {
-            // 取消订单回补库存；若因售罄自动置为已售则恢复在售
-            int stock = item.getStock() == null ? 1 : item.getStock();
-            item.setStock(stock + 1);
-            if ("已售".equals(item.getStatus())) item.setStatus("在售");
-            itemMapper.updateById(item);
-            redisTemplate.delete("item:" + item.getId());
+        // CAS 占位：仅"待发货"可取消，防止并发重复回补库存
+        if (orderMapper.casStatus(orderId, "待发货", "已取消") == 0) {
+            throw new RuntimeException("当前状态无法取消");
         }
+        itemMapper.restock(order.getItemId());
+        redisTemplate.delete("item:" + order.getItemId());
         clearHomeItemCache();
     }
 
@@ -235,16 +232,12 @@ public class OrderServiceImpl implements OrderService {
                         .eq(Order::getStatus, "待发货")
                         .lt(Order::getCreatedAt, deadline));
         for (Order order : expired) {
-            order.setStatus("已取消");
-            orderMapper.updateById(order);
-            Item item = itemMapper.selectById(order.getItemId());
-            if (item != null) {
-                int stock = item.getStock() == null ? 1 : item.getStock();
-                item.setStock(stock + 1);
-                if ("已售".equals(item.getStatus())) item.setStatus("在售");
-                itemMapper.updateById(item);
-                redisTemplate.delete("item:" + item.getId());
+            // CAS 防止与买家手动取消并发时重复回补库存
+            if (orderMapper.casStatus(order.getId(), "待发货", "已取消") == 0) {
+                continue;
             }
+            itemMapper.restock(order.getItemId());
+            redisTemplate.delete("item:" + order.getItemId());
             clearHomeItemCache();
         }
         return expired.size();

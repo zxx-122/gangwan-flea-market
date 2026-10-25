@@ -76,10 +76,10 @@ public class UserController {
         if (user == null) return Result.error("用户不存在");
         if (user.getStatus() != null && user.getStatus() == 0) return Result.error("账号已被禁用");
 
-        user.setBalance(user.getBalance().add(amount));
         userService.addBalance(user, amount, "余额充值");
         Map<String, Object> result = new java.util.HashMap<>();
-        result.put("balance", user.getBalance());
+        // 余额已由 Service 原子更新，回读最新值返回
+        result.put("balance", userService.getById(userId).getBalance());
         return Result.success(result);
     }
 

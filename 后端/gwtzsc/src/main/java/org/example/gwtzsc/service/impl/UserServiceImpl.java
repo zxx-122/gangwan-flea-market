@@ -115,6 +115,8 @@ public class UserServiceImpl implements UserService {
                     new LambdaQueryWrapper<User>().eq(User::getPhone, req.getPhone()));
             if (user == null) throw new RuntimeException("该手机号尚未注册");
             if (user.getStatus() == 0) throw new RuntimeException("账号已被禁用");
+            // 验证码一次性使用：登录成功后立即销毁，防止 5 分钟内重放
+            redisTemplate.delete(SMS_PREFIX + req.getPhone());
             return buildLoginResult(user);
         }
 
@@ -197,27 +199,32 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void addBalance(User user, BigDecimal amount, String remark) {
-        userMapper.updateById(user);
-        fundFlowService.record(user.getId(), "RECHARGE", amount, user.getBalance(), remark, null);
+        // 原子加余额，防止并发充值/结算互相覆盖
+        userMapper.increaseBalance(user.getId(), amount);
+        fundFlowService.record(user.getId(), "RECHARGE", amount,
+                userMapper.selectById(user.getId()).getBalance(), remark, null);
     }
 
     @Override
     @Transactional
-    public Map<String, Object> withdraw(Long userId, WithdrawRequest req) {        BigDecimal amount = req.getAmount();
+    public Map<String, Object> withdraw(Long userId, WithdrawRequest req) {
+        BigDecimal amount = req.getAmount();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException("提现金额必须大于0");
         }
         User user = userMapper.selectById(userId);
         if (user == null) throw new RuntimeException("用户不存在");
         if (user.getStatus() == 0) throw new RuntimeException("账号已被禁用");
-        if (user.getBalance().compareTo(amount) < 0) throw new RuntimeException("余额不足");
 
-        user.setBalance(user.getBalance().subtract(amount));
-        userMapper.updateById(user);
-        fundFlowService.record(userId, "WITHDRAW", amount, user.getBalance(), "余额提现", null);
+        // 原子扣减余额（余额不足则失败），防止并发提现双花
+        if (userMapper.deductBalance(userId, amount) == 0) {
+            throw new RuntimeException("余额不足");
+        }
+        User updated = userMapper.selectById(userId);
+        fundFlowService.record(userId, "WITHDRAW", amount, updated.getBalance(), "余额提现", null);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("balance", user.getBalance());
+        result.put("balance", updated.getBalance());
         return result;
     }
 

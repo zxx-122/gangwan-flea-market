@@ -32,10 +32,14 @@ api.interceptors.response.use(
         if (err.response) {
             const { code, msg } = err.response.data;
             if (code === 401) {
+                // 清除失效凭证；仅在受保护页面才跳登录（公开页继续游客浏览，不被劫持）
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                if (!window.location.pathname.endsWith('login.html')) {
-                    // 记住当前页面，登录后跳回
+                const onLoginPage = window.location.pathname.endsWith('login.html');
+                const hash = window.location.hash || '';
+                const PROTECTED = ['#/publish', '#/my-items', '#/orders', '#/sales', '#/messages', '#/chat', '#/favorites', '#/wallet'];
+                const isProtected = PROTECTED.some(pre => hash.startsWith(pre));
+                if (!onLoginPage && isProtected) {
                     const back = encodeURIComponent(window.location.href);
                     window.location.href = 'login.html?back=' + back;
                 }

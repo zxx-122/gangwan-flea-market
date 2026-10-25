@@ -93,6 +93,18 @@ ul, li { list-style: none; }
 .page { padding-bottom: calc(var(--tabbar-height) + var(--safe-bottom) + 16px); min-height: 100vh; }
 .page-no-tabbar { padding-bottom: 24px; min-height: 100vh; }
 
+/* 备案信息 / 非盈利声明页脚 */
+.site-footer {
+    padding: 20px 20px calc(var(--tabbar-height) + var(--safe-bottom) + 20px);
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-light);
+}
+.site-footer-disclaimer { max-width: 680px; margin: 0 auto 10px; }
+.site-footer a { color: var(--text-light); }
+.site-footer a:hover { color: var(--primary); }
+
 /* 玻璃导航栏 */
 .navbar {
     position: sticky;
@@ -1573,3 +1585,14 @@ input[type="tel"] { -webkit-appearance: none; }
 .wr-t { font-size: 11px; color: #555; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wr-p { font-size: 11px; color: #FF6B35; font-weight: 600; }
 .price-ref.want-ref b { color: #e67e22; }
+
+/* ===================== 详情骨架屏 / 首页运营Banner ===================== */
+.detail-skeleton .sk-banner { width: 100%; height: 300px; background: linear-gradient(100deg, #f2f2f2 40%, #fafafa 50%, #f2f2f2 60%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
+.home-banner { position: relative; margin: 12px 12px 0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(255,122,69,.15); }
+.banner-slide { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; min-height: 84px; color: #fff; cursor: pointer; }
+.bs-title { font-size: 17px; font-weight: 700; }
+.bs-sub { font-size: 12px; opacity: .9; margin-top: 4px; }
+.bs-emoji { font-size: 40px; margin-left: 14px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.15)); }
+.banner-dots { position: absolute; bottom: 8px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; }
+.banner-dots span { width: 6px; height: 6px; border-radius: 999px; background: rgba(255,255,255,.5); cursor: pointer; transition: all .2s; }
+.banner-dots span.on { background: #fff; width: 14px; }

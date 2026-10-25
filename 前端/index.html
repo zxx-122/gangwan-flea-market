@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>港湾跳蚤市场</title>
     <link href="lib/font-awesome/css/font-awesome.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=20261008">
     <script src="lib/vue.global.prod.js"></script>
     <script src="lib/vue-router.global.prod.js"></script>
     <script src="lib/axios.min.js"></script>
-    <script src="js/config.js"></script>
-    <script src="js/effects.js"></script>
-    <script src="js/api.js"></script>
+    <script src="js/config.js?v=20261008"></script>
+    <script src="js/effects.js?v=20261008"></script>
+    <script src="js/api.js?v=20261008"></script>
 </head>
 <body>
 <div id="app">
@@ -22,11 +22,18 @@
         <div class="ambient-blob blob-3"></div>
     </div>
 
+    <!-- keep-alive 缓存列表页：从详情/聊天返回时不重新加载、不丢滚动位置 -->
     <router-view v-slot="{ Component }">
-        <transition name="route" mode="out-in">
+        <keep-alive include="Home,Want,Orders,Sales,Favorites,History">
             <component :is="Component" />
-        </transition>
+        </keep-alive>
     </router-view>
+
+    <!-- 备案信息 / 非盈利声明 -->
+    <footer class="site-footer">
+        <p class="site-footer-disclaimer">本站为个人学习交流的非经营性演示项目，仅用于技术学习与功能测试；不提供任何真实商品或服务交易，不涉及任何资金支付、收款、提现；站内信息均为模拟数据，真实性、准确性请自行核实，使用本站所产生的一切后果由用户自行承担。</p>
+        <p><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鲁ICP备2026053447号-1</a></p>
+    </footer>
 
     <!-- 全局底部 Tab 栏（仅主页面显示） -->
     <div class="tabbar" v-if="showTabbar">
@@ -47,7 +54,7 @@
 </div>
 
 <script>
-const { createApp, ref, reactive, computed, onMounted, onUnmounted, onActivated, watch, nextTick } = Vue;
+const { createApp, ref, reactive, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory, useRouter, useRoute } = VueRouter;
 
 // ===================== 全局 store（挂在 window 上，跨组件共享） =====================
@@ -89,6 +96,7 @@ setInterval(() => store.refreshUnread(), 30000);
 
 // ===================== 首页 =====================
 const Home = {
+    name: 'Home',
     template: `
     <div class="page" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
         <div class="pull-indicator" :class="{refreshing: refreshing}" :style="{height: pullDist + 'px', padding: (pullDist > 20 || refreshing) ? '12px 0' : '0', overflow: 'hidden'}">
@@ -118,6 +126,19 @@ const Home = {
             <span class="notice-text">{{store.announcement.title}}</span>
             <i class="fa fa-angle-right" style="margin-left:auto;"></i>
             <i class="fa fa-times notice-close" @click.stop="closeNotice"></i>
+        </div>
+        <!-- 运营 Banner 轮播 -->
+        <div class="home-banner" v-if="banners.length">
+            <div class="banner-slide" v-for="(b,i) in banners" :key="i" v-show="bannerIdx===i" :style="{background: b.bg}" @click="bannerClick(b)">
+                <div class="bs-text">
+                    <div class="bs-title">{{b.title}}</div>
+                    <div class="bs-sub">{{b.sub}}</div>
+                </div>
+                <div class="bs-emoji">{{b.emoji}}</div>
+            </div>
+            <div class="banner-dots">
+                <span v-for="(b,i) in banners" :key="i" :class="{on: bannerIdx===i}" @click="bannerIdx=i"></span>
+            </div>
         </div>
         <!-- 运营频道入口 -->
         <div class="op-row">
@@ -392,13 +413,43 @@ const Home = {
             store.loadCategories();
             load(true);
             store.refreshUnread();
+            startBanner();
+        });
+        // keep-alive 缓存：返回本页时恢复滚动位置、刷新角标（列表数据保留不重载）
+        onActivated(() => {
+            store.refreshUnread();
+            store.loadAnnouncement();
             window.addEventListener('scroll', onScroll);
         });
-        onUnmounted(() => { window.removeEventListener('scroll', onScroll); });
+        onUnmounted(() => {
+            window.removeEventListener('scroll', onScroll);
+            if (bannerTimer) clearInterval(bannerTimer);
+        });
 
         watch(searchOpen, v => {
             if (v) { searched.value = false; nextTick(() => searchInput.value && searchInput.value.focus()); }
         });
+
+        // 运营 Banner 轮播
+        const banners = [
+            { title: '校园闲置好物集市', sub: '让闲置遇见新主人', emoji: '🛍️', bg: 'linear-gradient(135deg,#FF9A44,#FF7A45)', to: null },
+            { title: '免费送专区', sub: '毕业季清仓 白捡好物', emoji: '🎁', bg: 'linear-gradient(135deg,#e74c3c,#ff7875)', search: '免费送' },
+            { title: '求购专区', sub: '说出你的需求 让卖家找你', emoji: '📢', bg: 'linear-gradient(135deg,#3498DB,#5DADE2)', to: '/want' },
+            { title: '数码捡漏', sub: '九成新好物 低至3折', emoji: '📱', bg: 'linear-gradient(135deg,#16a085,#1abc9c)', cat: 1 }
+        ];
+        const bannerIdx = ref(0);
+        let bannerTimer = null;
+        function bannerClick(b) {
+            if (b.to) router.push(b.to);
+            else if (b.search) { keyword.value = b.search; searchOpen.value = true; doSearch(); }
+            else if (b.cat) { filterCategory(b.cat); window.scrollTo({ top: 0 }); }
+        }
+        function startBanner() {
+            if (bannerTimer) clearInterval(bannerTimer);
+            bannerTimer = setInterval(() => {
+                bannerIdx.value = (bannerIdx.value + 1) % banners.length;
+            }, 3500);
+        }
 
         // 搜索历史（本地，最新在前，上限10条）
         const searchHistory = ref(JSON.parse(localStorage.getItem('searchHistory') || '[]'));
@@ -443,6 +494,7 @@ const Home = {
             searchOpen, keyword, searchResults, searched, searchInput, hotWords, suggestWords,
             searchLoading, searchNoMore, searchScroll, doSearch,
             searchHistory, pushSearchHistory, clearSearchHistory, searchWord,
+            banners, bannerIdx, bannerClick,
             showBackTop, backTop,
             goHistory, goFavorites,
             noticeOpen, noticeClosed, closeNotice,
@@ -462,7 +514,22 @@ const ItemDetail = {
             <div class="navbar-title">商品详情</div>
             <div class="navbar-right"></div>
         </div>
-        <div v-if="loading" style="padding:40px;text-align:center;color:#999;"><span class="scroll-spinner"></span> 加载中...</div>
+        <div v-if="loading && !detail" class="detail-skeleton">
+            <div class="sk-banner"></div>
+            <div class="card" style="margin:16px 12px;padding:16px;">
+                <div class="sk-line" style="width:30%;height:22px;"></div>
+                <div class="sk-line"></div>
+                <div class="sk-line short"></div>
+                <div class="sk-line tiny"></div>
+            </div>
+            <div class="card" style="margin:0 12px;padding:16px;display:flex;gap:12px;">
+                <div class="sk-line" style="width:48px;height:48px;border-radius:50%;margin:0;flex-shrink:0;"></div>
+                <div style="flex:1;">
+                    <div class="sk-line" style="width:40%;"></div>
+                    <div class="sk-line tiny" style="width:60%;"></div>
+                </div>
+            </div>
+        </div>
         <div v-else-if="detail">
             <div class="detail-carousel">
                 <img :src="imgUrl(currentImg)" @click="lightbox=true" @error="onImgErr">
@@ -1045,6 +1112,7 @@ const MyItems = {
 
 // ===================== 我的订单（买家） =====================
 const Orders = {
+    name: 'Orders',
     template: `
     <div class="page-no-tabbar">
         <div class="navbar glass">
@@ -1230,6 +1298,7 @@ const Orders = {
             return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
         }
         onMounted(load);
+        onActivated(() => { load(); });
         return { orders, loading, orderDetail, showDetailModal, cancel, confirm, showDetail, statusClass, statusIcon, shortDate, copyText, myReviewOfDetail,
                  showReview, reviewForm, openReview, submitReview, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
     }
@@ -1237,6 +1306,7 @@ const Orders = {
 
 // ===================== 卖单管理（卖家） =====================
 const Sales = {
+    name: 'Sales',
     template: `
     <div class="page-no-tabbar">
         <div class="navbar glass">
@@ -1397,6 +1467,7 @@ const Sales = {
             return { '待发货': 'fa fa-clock-o', '待收货': 'fa fa-truck', '已完成': 'fa fa-check-circle', '已取消': 'fa fa-times-circle' }[s] || '';
         }
         onMounted(load);
+        onActivated(() => { load(); });
         return { orders, loading, ship, statusClass, statusIcon, copyText, showReview, reviewForm, openReview, submitReview, imgUrl: getImageUrl, fmtPrice, fmtDateTime, onImgErr };
     }
 };
@@ -1550,6 +1621,7 @@ const Chat = {
 
 // ===================== 收藏列表 =====================
 const Favorites = {
+    name: 'Favorites',
     template: `
     <div class="page-no-tabbar">
         <div class="navbar glass">
@@ -1592,6 +1664,7 @@ const Favorites = {
             catch (e) { showToast(e.message); }
         }
         onMounted(load);
+        onActivated(() => { load(); });
         return { list, loading, unfav, imgUrl: getImageUrl, fmtPrice, onImgErr };
     }
 };
@@ -1868,6 +1941,7 @@ const Wallet = {
 
 // ===================== 浏览历史 =====================
 const History = {
+    name: 'History',
     template: `
     <div class="page-no-tabbar">
         <div class="navbar glass">
@@ -1912,12 +1986,14 @@ const History = {
             return (d.getMonth() + 1) + '-' + d.getDate() + ' ' + hm;
         }
         onMounted(load);
+        onActivated(() => { load(); });
         return { list, clearAll, fmtTime, imgUrl: getImageUrl, fmtPrice, onImgErr };
     }
 };
 
 // ===================== 求购专区 =====================
 const Want = {
+    name: 'Want',
     template: `
     <div class="page-no-tabbar">
         <div class="navbar glass">
@@ -2219,7 +2295,13 @@ const routes = [
 const router = createRouter({
     history: createWebHashHistory(),
     routes,
-    scrollBehavior() { return { top: 0 }; }
+    scrollBehavior(to, from, savedPosition) {
+        // 返回/前进导航恢复原位置（keep-alive 内容重挂后一帧再滚，避免高度未就绪）
+        if (savedPosition) {
+            return new Promise(resolve => nextTick(() => requestAnimationFrame(() => resolve(savedPosition))));
+        }
+        return { top: 0 };
+    }
 });
 
 router.beforeEach((to, from, next) => {
